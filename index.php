@@ -1,16 +1,19 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Upload to static</title>
+<title>Upload to AWS S3</title>
 <meta name=viewport content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
 <style>
-.inputs { display: flex; flex-direction: column; margin: 3em; align-items: left; justify-content: left;}
+/* http://stackoverflow.com/questions/36400558/ */
+body { font-size: x-large; }
+.inputs { display: flex; flex-direction: column; align-items: left; justify-content: left; }
 label { padding: 1em; margin: 0.3em; border: thin solid black; border-top-right-radius: 1em; }
 </style>
 
 <?php
-$creds = parse_ini_file("/path/to/.creds.ini");
+$creds = parse_ini_file(".creds.ini");
+// Expire policy after an hour ... still not much help since it can be abused for an hour then
 $expiry = str_replace('+00:00', '.000Z', date("c", time() + 60*60));
 
 $policy = '{
@@ -32,7 +35,13 @@ $signature = base64_encode(hash_hmac('sha1', $policy_b64, $creds["secret"], true
 function fileSelected(f) {
 	var file = f.files[0];
 	if (file) {
-		var key = new Date().toISOString().slice(0, 10) + '/' + file.name;
+		var ymd = new Date().toISOString().slice(0, 10);
+		if (file.name == "image.jpeg") {
+			// For IOS to have a unique filename
+			var key = ymd + '/' + file.name.substring(0, file.name.lastIndexOf(".")) + Math.round(new Date().getTime()/1000.0) + ".jpg";
+		} else {
+			var key = ymd + '/' + file.name;
+		}
 		var fileSize = 0;
 		if (file.size > 1024 * 1024)
 			fileSize = (Math.round(file.size * 100 / (1024 * 1024)) / 100).toString() + 'MB';
@@ -61,7 +70,7 @@ function fileSelected(f) {
 	xhr.addEventListener("load", uploadComplete, false);
 	xhr.addEventListener("error", uploadFailed, false);
 	xhr.addEventListener("abort", uploadCanceled, false);
-	xhr.open("POST", "https://s3-ap-southeast-1.amazonaws.com/<?=$creds["bucket"]?>");
+	xhr.open("POST", "https://s3-<?=$creds["region"]?>.amazonaws.com/<?=$creds["bucket"]?>");
 	xhr.send(fd);
 }
 
