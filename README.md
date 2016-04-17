@@ -12,9 +12,22 @@ A: No, because AWS POST API does not support multiple file uploads
 
 Create `.creds.ini` with
 
-	id = 'awsid'
+	awsid = 'awsid'
 	secret = 'awssecret'
 	bucket = 'yourbucket'
 	region = 'ap-southeast-1'
 
-Don't forget to hide it from being served !
+Don't forget to hide `.creds.ini` from being served ! Sample [Caddyfile configuration](https://caddyserver.com/):
+
+	up.example.com {
+		tls webmaster@example.com
+		root /srv/up.webmaster.com/
+		fastcgi / 127.0.0.1:9000 php
+		basicauth / hendry letmein
+		log up.access.log
+		errors up.error.log
+		rewrite {
+			r   /\.(.*)
+			status 404
+		}
+	}

@@ -55,7 +55,7 @@ function fileSelected(f) {
 
 	var fd = new FormData();
 
-	fd.append('AWSAccessKeyId', '<?=$creds["id"]?>');
+	fd.append('AWSAccessKeyId', '<?=$creds["awsid"]?>');
 	fd.append('policy', '<?=$policy_b64?>')
 	fd.append('signature','<?=$signature?>');
 
