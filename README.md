@@ -21,7 +21,7 @@ Don't forget to hide `.creds.ini` from being served ! Sample [Caddyfile configur
 
 	up.example.com {
 		tls webmaster@example.com
-		root /srv/up.webmaster.com/
+		root /srv/up.example.com/
 		fastcgi / 127.0.0.1:9000 php
 		basicauth / hendry letmein
 		log up.access.log
