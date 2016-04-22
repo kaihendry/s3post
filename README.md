@@ -2,6 +2,8 @@
 
 Is there a faster or more pleasant way to upload from a generic Web browser?
 
+<video src=http://s.natalian.org/2016-04-22/s3upload.mp4 controls></video>
+
 # FAQ
 
 Q: Does it support **multiple** [file uploads](https://html.spec.whatwg.org/multipage/forms.html#file-upload-state-(type=file))?
