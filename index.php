@@ -13,6 +13,7 @@ label { padding: 1em; margin: 0.3em; border: thin solid black; border-top-right-
 
 <?php
 $creds = parse_ini_file(".creds.ini");
+
 // Expire policy after an hour ... still not much help since it can be abused for an hour then
 $expiry = str_replace('+00:00', '.000Z', date("c", time() + 60*60));
 
@@ -36,19 +37,27 @@ function fileSelected(f) {
 	var file = f.files[0];
 	if (file) {
 		var ymd = new Date().toISOString().slice(0, 10);
+
 		if (file.name == "image.jpeg") {
 			// For IOS to have a unique filename
 			var key = ymd + '/' + file.name.substring(0, file.name.lastIndexOf(".")) + Math.round(new Date().getTime()/1000.0) + ".jpg";
 		} else {
 			var key = ymd + '/' + file.name;
 		}
+
+		filename = document.getElementById("filename").value;
+
+		if (filename) {
+			var key = ymd + '/' + filename + '.' + file.name.split('.').pop();
+		}
+
 		var fileSize = 0;
 		if (file.size > 1024 * 1024)
 			fileSize = (Math.round(file.size * 100 / (1024 * 1024)) / 100).toString() + 'MB';
 		else
 			fileSize = (Math.round(file.size * 100 / 1024) / 100).toString() + 'KB';
 
-		document.getElementById('fileName').innerHTML = '<a href=http://<?=$creds["bucket"]?>/' + key + '>Name: ' + file.name + '</a>';
+		document.getElementById('fileName').innerHTML = '<a href=http://<?=$creds["bucket"]?>/' + key + '>Name: ' + key + '</a>';
 		document.getElementById('fileSize').innerHTML = 'Size: ' + fileSize;
 		document.getElementById('fileType').innerHTML = 'Type: ' + file.type;
 	}
@@ -58,7 +67,6 @@ function fileSelected(f) {
 	fd.append('AWSAccessKeyId', '<?=$creds["awsid"]?>');
 	fd.append('policy', '<?=$policy_b64?>')
 	fd.append('signature','<?=$signature?>');
-
 
 	fd.append('key', key);
 	fd.append('acl', 'public-read');
@@ -113,6 +121,7 @@ function uploadCanceled(evt) {
 <div id="progressNumber"></div>
 
 <div class=inputs>
+<label><strong>Optional:</strong> Upload file name <input type=text id=filename></label>
 <label>Upload file <input type=file onchange="fileSelected(this);" name=upload></label>
 </div>
 
