@@ -4,6 +4,7 @@
 <title>Upload to AWS S3</title>
 <meta name=viewport content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
+<script src=https://cdnjs.cloudflare.com/ajax/libs/fetch/1.0.0/fetch.min.js></script>
 <style>
 /* http://stackoverflow.com/questions/36400558/ */
 body { font-size: x-large; }
@@ -40,7 +41,7 @@ function fileSelected(f) {
 
 		if (file.name == "image.jpeg") {
 			// For IOS to have a unique filename
-			var key = ymd + '/' + file.name.substring(0, file.name.lastIndexOf(".")) + Math.round(new Date().getTime()/1000.0) + ".jpg";
+			var key = ymd + '/' + file.name.substring(0, file.name.lastIndexOf(".")) + Math.round(new Date().getTime() / 1000.0) + ".jpg";
 		} else {
 			var key = ymd + '/' + file.name;
 		}
@@ -52,10 +53,7 @@ function fileSelected(f) {
 		}
 
 		var fileSize = 0;
-		if (file.size > 1024 * 1024)
-			fileSize = (Math.round(file.size * 100 / (1024 * 1024)) / 100).toString() + 'MB';
-		else
-			fileSize = (Math.round(file.size * 100 / 1024) / 100).toString() + 'KB';
+		if (file.size > 1024 * 1024) fileSize = (Math.round(file.size * 100 / (1024 * 1024)) / 100).toString() + 'MB';else fileSize = (Math.round(file.size * 100 / 1024) / 100).toString() + 'KB';
 
 		document.getElementById('fileName').innerHTML = '<a href=http://<?=$creds["bucket"]?>/' + key + '>Name: ' + key + '</a>';
 		document.getElementById('fileSize').innerHTML = 'Size: ' + fileSize;
@@ -65,46 +63,35 @@ function fileSelected(f) {
 	var fd = new FormData();
 
 	fd.append('AWSAccessKeyId', '<?=$creds["awsid"]?>');
-	fd.append('policy', '<?=$policy_b64?>')
-	fd.append('signature','<?=$signature?>');
+	fd.append('policy', '<?=$policy_b64?>');
+	fd.append('signature', '<?=$signature?>');
 
 	fd.append('key', key);
 	fd.append('acl', 'public-read');
 	fd.append('Content-Type', file.type);
 	fd.append("file", f.files[0]);
-	
-	var xhr = new XMLHttpRequest();
-	xhr.upload.addEventListener("progress", uploadProgress, false);
-	xhr.addEventListener("load", uploadComplete, false);
-	xhr.addEventListener("error", uploadFailed, false);
-	xhr.addEventListener("abort", uploadCanceled, false);
-	xhr.open("POST", "https://s3-<?=$creds["region"]?>.amazonaws.com/<?=$creds["bucket"]?>");
-	xhr.send(fd);
-}
 
-function uploadProgress(evt) {
-	if (evt.lengthComputable) {
-		var percentComplete = Math.round(evt.loaded * 100 / evt.total);
-		document.getElementById('progressNumber').innerHTML = percentComplete.toString() + '%';
-	}
-	else {
-		document.getElementById('progressNumber').innerHTML = 'unable to compute';
-	}
-}
+	fetch('https://s3-<?=$creds["region"]?>.amazonaws.com/<?=$creds["bucket"]?>', { method: "POST", body: fd }).then(function (res) {
+		if (res.ok) {
+			console.log(res);
+			console.log("key", key);
 
-function uploadComplete(evt) {
-	/* This event is raised when the server send back a response */
-	document.getElementById('response').innerHTML = evt.target.responseText;
-}
+			var formData = new FormData();
+			formData.append("from", "up@dabase.com");
+			formData.append("msg", 'http://<?=$creds["bucket"]?>/' + key);
 
-function uploadFailed(evt) {
-	alert("There was an error attempting to upload the file.");
+			fetch("https://feedback.dabase.com/feedback/feedback.php", { method: "POST", body: formData }).then(function (res) {
+				if (res.ok) {
+					console.log(res);
+				} else {
+					console.log("error", res);
+				}
+			});
+		} else {
+			console.log("error", res);
+		}
+	});
 }
-
-function uploadCanceled(evt) {
-	alert("The upload has been canceled by the user or the browser dropped the connection.");
-}
-
 </script>
 </head>
 <body>
@@ -112,8 +99,6 @@ function uploadCanceled(evt) {
 <!--<pre>
 <?=$policy?>
 </pre>-->
-
-<p id=response></p>
 
 <div id="fileName"></div>
 <div id="fileSize"></div>
