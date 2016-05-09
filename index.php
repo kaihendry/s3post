@@ -7,7 +7,7 @@
 <script src=https://cdnjs.cloudflare.com/ajax/libs/fetch/1.0.0/fetch.min.js></script>
 <style>
 /* http://stackoverflow.com/questions/36400558/ */
-body { font-size: x-large; }
+body, button { font-size: x-large; }
 .inputs { display: flex; flex-direction: column; align-items: left; justify-content: left; }
 label { padding: 1em; margin: 0.3em; border: thin solid black; border-top-right-radius: 1em; }
 </style>
@@ -34,8 +34,11 @@ $signature = base64_encode(hash_hmac('sha1', $policy_b64, $creds["secret"], true
 
 
 <script>
-function fileSelected(f) {
+function fileSelected() {
+
+	f = document.getElementById("file");
 	var file = f.files[0];
+
 	if (file) {
 		var ymd = new Date().toISOString().slice(0, 10);
 
@@ -106,8 +109,9 @@ function fileSelected(f) {
 <div id="progressNumber"></div>
 
 <div class=inputs>
-<label><strong>Optional:</strong> Upload file name <input type=text id=filename></label>
-<label>Upload file <input type=file onchange="fileSelected(this);" name=upload></label>
+<label><strong>Optional:</strong> Upload file name <input type=text id=filename autocomplete=off></label>
+<label>Upload file <input type=file id=file></label>
+<button onclick="fileSelected()";>Upload</button>
 </div>
 
 </body>
