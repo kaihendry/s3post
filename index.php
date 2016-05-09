@@ -7,7 +7,7 @@
 <script src=https://cdnjs.cloudflare.com/ajax/libs/fetch/1.0.0/fetch.min.js></script>
 <style>
 /* http://stackoverflow.com/questions/36400558/ */
-body, button { font-size: x-large; }
+body, input[type=submit] { font-size: x-large; }
 .inputs { display: flex; flex-direction: column; align-items: left; justify-content: left; }
 label { padding: 1em; margin: 0.3em; border: thin solid black; border-top-right-radius: 1em; }
 </style>
@@ -94,6 +94,8 @@ function fileSelected() {
 			console.log("error", res);
 		}
 	});
+
+	return false;
 }
 </script>
 </head>
@@ -108,11 +110,11 @@ function fileSelected() {
 <div id="fileType"></div>
 <div id="progressNumber"></div>
 
-<div class=inputs>
-<label><strong>Optional:</strong> Upload file name <input type=text id=filename autocomplete=off></label>
-<label>Upload file <input type=file id=file></label>
-<button onclick="fileSelected()";>Upload</button>
-</div>
+<form class=inputs onsubmit="return fileSelected(this);">
+<label><strong>Optional:</strong> Upload file name <input type=text pattern="[a-z]+" id=filename autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></label>
+<label>Upload file <input type=file required id=file></label>
+<input type=submit value="Upload">
+</form>
 
 </body>
 </html>
