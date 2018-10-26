@@ -4,7 +4,6 @@
 <title>Upload to AWS S3</title>
 <meta name=viewport content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
-<script src=https://cdnjs.cloudflare.com/ajax/libs/fetch/1.0.0/fetch.min.js></script>
 <style>
 /* http://stackoverflow.com/questions/36400558/ */
 body, input[type=submit] { font-size: x-large; }
@@ -76,14 +75,11 @@ function fileSelected() {
 
 	fetch('https://s3-<?=$creds["region"]?>.amazonaws.com/<?=$creds["bucket"]?>', { method: "POST", body: fd }).then(function (res) {
 		if (res.ok) {
-			console.log(res);
-			console.log("key", key);
 
-			var formData = new FormData();
-			formData.append("from", "up@dabase.com");
-			formData.append("msg", 'http://<?=$creds["bucket"]?>/' + key);
+		var feedback = {};
+		feedback["msg"] = 'http://<?=$creds["bucket"]?>/' + key;
 
-			fetch("https://feedback.dabase.com/feedback/feedback.php", { method: "POST", body: formData }).then(function (res) {
+	fetch("https://eb1tv85d00.execute-api.ap-southeast-1.amazonaws.com/prod", { method: "POST", body: JSON.stringify(feedback) }).then(function(res){
 				if (res.ok) {
 					console.log(res);
 				} else {
