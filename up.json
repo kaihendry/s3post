@@ -8,5 +8,8 @@
     "production": {
       "domain": "up.dabase.com"
     }
+  },
+  "error_pages": {
+    "disable": true
   }
 }

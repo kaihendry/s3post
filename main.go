@@ -15,19 +15,58 @@ import (
 	"github.com/gorilla/mux"
 )
 
+var views = template.Must(template.ParseGlob("templates/*.tmpl"))
+
 func main() {
 	addr := ":" + os.Getenv("PORT")
 	app := mux.NewRouter()
 
 	app.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("./static/"))))
 	app.HandleFunc("/", handleIndex).Methods("GET")
+	app.HandleFunc("/setpassword", submit).Methods("POST")
+	app.HandleFunc("/password", passwordprompt).Methods("GET")
 
 	if err := http.ListenAndServe(addr, app); err != nil {
 		log.WithError(err).Fatal("error listening")
 	}
 }
 
+func submit(w http.ResponseWriter, r *http.Request) {
+	password := r.FormValue("password")
+
+	log.WithFields(log.Fields{
+		"password": password,
+	}).Info("submit")
+
+	http.SetCookie(w, &http.Cookie{
+		Name:  "password",
+		Value: password,
+	})
+
+	http.Redirect(w, r, "/", http.StatusFound)
+}
+
+func passwordprompt(w http.ResponseWriter, r *http.Request) {
+	views.ExecuteTemplate(w, "passwordprompt.tmpl", map[string]interface{}{})
+}
+
 func handleIndex(w http.ResponseWriter, r *http.Request) {
+
+	c, err := r.Cookie("password")
+
+	if err != nil {
+		log.Error("Missing cookie")
+		http.Redirect(w, r, "/password", http.StatusFound)
+		return
+	}
+
+	if c.Value != os.Getenv("PASSWORD") {
+		log.WithFields(log.Fields{
+			"password": c.Value,
+		}).Error("credentials incorrect")
+		http.Redirect(w, r, "/password", http.StatusFound)
+		return
+	}
 
 	// https://docs.aws.amazon.com/AmazonS3/latest/API/sigv4-HTTPPOSTConstructPolicy.html
 
@@ -48,8 +87,7 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 	mac.Write([]byte(b64policy))
 	signature := base64.StdEncoding.EncodeToString(mac.Sum(nil))
 
-	t := template.Must(template.New("").ParseGlob("templates/*.tmpl"))
-	t.ExecuteTemplate(w, "index.tmpl", map[string]interface{}{
+	views.ExecuteTemplate(w, "index.tmpl", map[string]interface{}{
 		"Stage":     os.Getenv("UP_STAGE"),
 		"UPLOAD_ID": os.Getenv("UPLOAD_ID"),
 		"BUCKET":    os.Getenv("BUCKET"),
