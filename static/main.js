@@ -5,17 +5,18 @@ function fileSelected () {
   const Policy = document.getElementById('Policy').innerHTML
   const Signature = document.getElementById('Signature').innerHTML
 
-  f = document.getElementById('file')
-  var file = f.files[0]
+  const f = document.getElementById('file')
+  const file = f.files[0]
+  let key
 
   if (file) {
-    var ymd = new Date().toISOString().slice(0, 10)
-    var key = ymd + '/' + file.name
+    const ymd = new Date().toISOString().slice(0, 10)
+    key = ymd + '/' + file.name
 
     // filename can be overidden by the form input
-    filename = document.getElementById('filename').value
+    const filename = document.getElementById('filename').value
     if (filename) {
-      var key = ymd + '/' + filename + '.' + file.name.split('.').pop()
+      key = ymd + '/' + filename + '.' + file.name.split('.').pop()
     }
 
     var fileSize = 0
@@ -26,7 +27,7 @@ function fileSelected () {
     document.getElementById('fileType').innerHTML = `Type: ${file.type}`
   }
 
-  var fd = new FormData()
+  const fd = new window.FormData()
 
   fd.append('AWSAccessKeyId', UPLOAD_ID)
   fd.append('policy', window.btoa(Policy))
@@ -37,21 +38,20 @@ function fileSelected () {
   fd.append('Content-Type', file.type)
   fd.append('file', f.files[0])
 
-  console.log(fd)
-
-  fetch(`https://s3-${REGION}.amazonaws.com/${BUCKET}`, { method: 'POST', body: fd }).then(function (res) {
+  window.fetch(`https://s3-${REGION}.amazonaws.com/${BUCKET}`, { method: 'POST', body: fd }).then(function (res) {
     if (res.ok) {
+      // Notify me via SNS of a successful upload
       var feedback = {}
       feedback['msg'] = `//${BUCKET}/${key}`
-      fetch('https://eb1tv85d00.execute-api.ap-southeast-1.amazonaws.com/prod', { method: 'POST', body: JSON.stringify(feedback) }).then(function (res) {
+      window.fetch('https://eb1tv85d00.execute-api.ap-southeast-1.amazonaws.com/prod', { method: 'POST', body: JSON.stringify(feedback) }).then(function (res) {
         if (res.ok) {
           console.log(res)
         } else {
-          console.log('error', res)
+          console.error(res)
         }
       })
     } else {
-      console.log('error', res)
+      console.error(res)
     }
   })
 

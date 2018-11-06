@@ -1,8 +1,34 @@
 # Authenticated AJAX POST to AWS S3 example 🙌
 
-Is there a faster or more pleasant way to upload from a generic Web browser?
+Requires the following environment variables to be set:
 
-<video src=http://s.natalian.org/2016-04-22/s3upload.mp4 controls></video>
+* BUCKET e.g. s.natalian.org, same domain as my CloudFront domain, https://s.natalian.org
+* PASSWORD e.g. "abracadabra" used to authenticate the client
+* REGION e.g. ap-southeast-1, where the bucket is located
+* UPLOAD_ID the AWS_ACCESS_KEY_ID for uploading to the bucket only
+* UPLOAD_SECRET the secret AWS_SECRET_ACCESS_KEY counterpart to the restricted AWS_ACCESS_KEY_ID
 
+# S3 policy for restricting bucket upload
 
-Aim is to implement https://docs.aws.amazon.com/sdkforruby/api/Aws/S3/PresignedPost.html
+	{ "Version": "2012-10-17",
+		"Statement": [
+		{
+			"Sid": "Stmt1460356082000",
+			"Effect": "Allow",
+			"Action": [
+				"s3:Put*"
+			],
+			"Resource": [ "arn:aws:s3:::s.natalian.org", "arn:aws:s3:::s.natalian.org/*" ]
+		}
+		]
+	}
+
+TODO: Filename validator https://stackoverflow.com/questions/53167402
+
+TODO is to implement a native Golang SDK
+[createPresignedPost](https://github.com/aws/aws-sdk-go-v2/issues/171)
+
+https://github.com/TTLabs/EvaporateJS is far too complex. [Alex
+Russell](https://twitter.com/slightlylate/status/1059599437998186498) says
+[they are working on
+it!](https://www.chromestatus.com/feature/5712608971718656)

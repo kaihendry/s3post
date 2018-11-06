@@ -6,7 +6,7 @@
 <meta name="robots" content="noindex">
 <style>
 /* http://stackoverflow.com/questions/36400558/ */
-body, input[type=submit] { font-size: x-large; }
+body, input[type=submit] { font-size: x-large;   font-family: "Noto Serif", serif; }
 .inputs { display: flex; flex-direction: column; align-items: left; justify-content: left; }
 label { padding: 1em; margin: 0.3em; border: thin solid black; border-top-right-radius: 1em; }
 </style>
@@ -23,7 +23,7 @@ label { padding: 1em; margin: 0.3em; border: thin solid black; border-top-right-
 
 <label>
 <strong>Optional:</strong> Upload file name
-<input type=text pattern="[a-z]+" id=filename autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+<input type=text pattern="[0-9]+([A-Z]|[a-z])+" id=filename autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
 </label>
 <label>Upload file <input type=file required id=file></label>
 <input type=submit value="Upload">
