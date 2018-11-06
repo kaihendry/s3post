@@ -14,19 +14,6 @@ label { padding: 1em; margin: 0.3em; border: thin solid black; border-top-right-
 </head>
 <body>
 
-<dl>
-	<dt>BUCKET</dt>
-	<dd id="BUCKET">{{ .BUCKET  }}</dd>
-	<dt>UPLOAD_ID</dt>
-	<dd id="UPLOAD_ID">{{ .UPLOAD_ID  }}</dd>
-	<dt>REGION</dt>
-	<dd id="REGION">{{ .REGION  }}</dd>
-	<dt>Policy</dt>
-	<dd><pre id="Policy">{{ .Policy  }}</pre></dd>
-	<dt>Signature</dt>
-	<dd><pre id="Signature">{{ .Signature  }}</pre></dd>
-</dl>
-
 <div id="fileName"></div>
 <div id="fileSize"></div>
 <div id="fileType"></div>
@@ -41,6 +28,19 @@ label { padding: 1em; margin: 0.3em; border: thin solid black; border-top-right-
 <label>Upload file <input type=file required id=file></label>
 <input type=submit value="Upload">
 </form>
+
+<dl>
+	<dt>BUCKET</dt>
+	<dd id="BUCKET">{{ .BUCKET  }}</dd>
+	<dt>UPLOAD_ID</dt>
+	<dd id="UPLOAD_ID">{{ .UPLOAD_ID  }}</dd>
+	<dt>REGION</dt>
+	<dd id="REGION">{{ .REGION  }}</dd>
+	<dt>Policy</dt>
+	<dd><pre id="Policy">{{ .Policy  }}</pre></dd>
+	<dt>Signature</dt>
+	<dd><pre id="Signature">{{ .Signature  }}</pre></dd>
+</dl>
 
 </body>
 </html>
