@@ -1,6 +1,6 @@
 function fileSelected () {
   const BUCKET = document.getElementById('BUCKET').innerHTML
-  const AWS_ACCESS_KEY_ID = document.getElementById('AWS_ACCESS_KEY_ID').innerHTML
+  const UPLOAD_ID = document.getElementById('UPLOAD_ID').innerHTML
   const REGION = document.getElementById('REGION').innerHTML
   const Policy = document.getElementById('Policy').innerHTML
   const Signature = document.getElementById('Signature').innerHTML
@@ -28,7 +28,7 @@ function fileSelected () {
 
   var fd = new FormData()
 
-  fd.append('AWSAccessKeyId', AWS_ACCESS_KEY_ID)
+  fd.append('AWSAccessKeyId', UPLOAD_ID)
   fd.append('policy', window.btoa(Policy))
   fd.append('signature', Signature)
 

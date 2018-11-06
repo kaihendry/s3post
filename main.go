@@ -28,9 +28,6 @@ func main() {
 }
 
 func handleIndex(w http.ResponseWriter, r *http.Request) {
-	if os.Getenv("UP_STAGE") != "production" {
-		w.Header().Set("X-Robots-Tag", "none")
-	}
 
 	// https://docs.aws.amazon.com/AmazonS3/latest/API/sigv4-HTTPPOSTConstructPolicy.html
 
@@ -45,17 +42,20 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 	]
 	}`, exp.Format("2006-01-02T15:04:05Z"), exp.Format("2006-01-02"), os.Getenv("BUCKET"))
 
-	mac := hmac.New(sha1.New, []byte(os.Getenv("AWS_SECRET_ACCESS_KEY")))
-	mac.Write([]byte(policy))
+	b64policy := base64.StdEncoding.EncodeToString([]byte(policy))
+
+	mac := hmac.New(sha1.New, []byte(os.Getenv("UPLOAD_SECRET")))
+	mac.Write([]byte(b64policy))
 	signature := base64.StdEncoding.EncodeToString(mac.Sum(nil))
 
 	t := template.Must(template.New("").ParseGlob("templates/*.tmpl"))
 	t.ExecuteTemplate(w, "index.tmpl", map[string]interface{}{
-		"Stage":             os.Getenv("UP_STAGE"),
-		"AWS_ACCESS_KEY_ID": os.Getenv("AWS_ACCESS_KEY_ID"),
-		"BUCKET":            os.Getenv("BUCKET"),
-		"REGION":            os.Getenv("REGION"),
-		"Policy":            policy,
-		"Signature":         signature,
+		"Stage":     os.Getenv("UP_STAGE"),
+		"UPLOAD_ID": os.Getenv("UPLOAD_ID"),
+		"BUCKET":    os.Getenv("BUCKET"),
+		"REGION":    os.Getenv("REGION"),
+		"Policy":    policy,
+		"B64Policy": b64policy,
+		"Signature": signature,
 	})
 }
