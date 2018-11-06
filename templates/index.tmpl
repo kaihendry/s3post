@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Upload to AWS S3 {{ .Stage }}</title>
+<meta name=viewport content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<style>
+/* http://stackoverflow.com/questions/36400558/ */
+body, input[type=submit] { font-size: x-large; }
+.inputs { display: flex; flex-direction: column; align-items: left; justify-content: left; }
+label { padding: 1em; margin: 0.3em; border: thin solid black; border-top-right-radius: 1em; }
+</style>
+<script src="static/main.js"></script>
+</head>
+<body>
+
+<dl>
+	<dt>BUCKET</dt>
+	<dd id="BUCKET">{{ .BUCKET  }}</dd>
+	<dt>AWS_ACCESS_KEY_ID</dt>
+	<dd id="AWS_ACCESS_KEY_ID">{{ .AWS_ACCESS_KEY_ID  }}</dd>
+	<dt>REGION</dt>
+	<dd id="REGION">{{ .REGION  }}</dd>
+	<dt>Policy</dt>
+	<dd><pre id="Policy">{{ .Policy  }}</pre></dd>
+	<dt>Signature</dt>
+	<dd><pre id="Signature">{{ .Signature  }}</pre></dd>
+</dl>
+
+<div id="fileName"></div>
+<div id="fileSize"></div>
+<div id="fileType"></div>
+<div id="progressNumber"></div>
+
+<form class=inputs onsubmit="return fileSelected(this);">
+
+<label>
+<strong>Optional:</strong> Upload file name
+<input type=text pattern="[a-z]+" id=filename autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+</label>
+<label>Upload file <input type=file required id=file></label>
+<input type=submit value="Upload">
+</form>
+
+</body>
+</html>

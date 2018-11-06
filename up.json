@@ -1,0 +1,12 @@
+{
+  "name": "s3post",
+  "profile": "mine",
+  "regions": [
+    "ap-southeast-1"
+  ],
+  "stages": {
+    "production": {
+      "domain": "up.dabase.com"
+    }
+  }
+}
