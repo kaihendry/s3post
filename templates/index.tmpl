@@ -23,7 +23,7 @@ label { padding: 1em; margin: 0.3em; border: thin solid black; border-top-right-
 
 <label>
 <strong>Optional:</strong> Upload file name
-<input type=text pattern="[0-9]+([A-Z]|[a-z])+" id=filename autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+<input type=text pattern="([0-9]|[A-Z]|[a-z]|[!\-_.*'\(\)])+" id=filename autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
 </label>
 <label>Upload file <input type=file required id=file></label>
 <input type=submit value="Upload">
