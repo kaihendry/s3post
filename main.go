@@ -39,8 +39,9 @@ func submit(w http.ResponseWriter, r *http.Request) {
 	}).Info("submit")
 
 	http.SetCookie(w, &http.Cookie{
-		Name:  "password",
-		Value: password,
+		Name:    "password",
+		Value:   password,
+		Expires: time.Now().Add(8760 * time.Hour),
 	})
 
 	http.Redirect(w, r, "/", http.StatusFound)

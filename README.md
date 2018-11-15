@@ -1,9 +1,11 @@
+Video explaining the project: https://www.youtube.com/watch?v=75XYVGakPWI
+
 # Authenticated AJAX POST to AWS S3 example 🙌
 
 Requires the following environment variables to be set:
 
 * BUCKET e.g. s.natalian.org, same domain as my CloudFront domain, https://s.natalian.org
-* PASSWORD e.g. "abracadabra" used to authenticate the client
+* PASSWORD e.g. "abracadabra" used to authenticate the client via a cookie
 * REGION e.g. ap-southeast-1, where the bucket is located
 * UPLOAD_ID the AWS_ACCESS_KEY_ID for uploading to the bucket only
 * UPLOAD_SECRET the secret AWS_SECRET_ACCESS_KEY counterpart to the restricted AWS_ACCESS_KEY_ID
@@ -22,8 +24,6 @@ Requires the following environment variables to be set:
 		}
 		]
 	}
-
-TODO: Filename validator https://stackoverflow.com/questions/53167402
 
 TODO is to implement a native Golang SDK
 [createPresignedPost](https://github.com/aws/aws-sdk-go-v2/issues/171)
