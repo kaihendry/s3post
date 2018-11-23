@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -73,6 +74,15 @@ func handler(ctx context.Context, evt S3PostSNS) (string, error) {
 	case ".png":
 		log.Info("png file")
 		err = transcode(pngquantprocess, uploadObject, uploadObject)
+		if err != nil {
+			log.WithError(err).Error("failed to pngquant png file")
+			return "", err
+		}
+	case ".mov":
+		log.Info("mov file")
+		mp4Object := uploadObject
+		mp4Object.Key = mp4Object.Key + ".mp4"
+		err = transcode(ffmpegprocess, uploadObject, mp4Object)
 		if err != nil {
 			log.WithError(err).Error("failed to pngquant png file")
 			return "", err
@@ -196,7 +206,7 @@ func transcode(fn convert, srcObject s3post.S3upload, dstObject s3post.S3upload)
 		return err
 	}
 
-	dst := tmpfile.Name()
+	dst := tmpfile.Name() + filepath.Ext(dstObject.Key)
 	defer os.Remove(tmpfile.Name())
 
 	err = fn(src, dst)
@@ -215,6 +225,22 @@ func transcode(fn convert, srcObject s3post.S3upload, dstObject s3post.S3upload)
 
 	return err
 
+}
+
+func ffmpegprocess(src string, dst string) (err error) {
+	var out []byte
+	path, err := exec.LookPath("./ffmpeg/ffmpeg")
+	if err != nil {
+		log.WithError(err).Error("no ffmpeg binary found")
+		return err
+	}
+	log.Info("Launching ffmpeg")
+	out, err = exec.Command(path, "-y", "-i", src, "-movflags", "+faststart", "-c:v", "libx264", dst).CombinedOutput()
+	if err != nil {
+		log.WithError(err).Errorf("ffmpeg failed: %s", out)
+		return err
+	}
+	return err
 }
 
 func pngquantprocess(src string, dst string) (err error) {
