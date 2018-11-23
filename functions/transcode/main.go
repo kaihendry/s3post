@@ -71,13 +71,6 @@ func handler(ctx context.Context, evt S3PostSNS) (string, error) {
 	var processedURL string
 
 	switch mediatype := strings.ToLower(path.Ext(uploadObject.Key)); mediatype {
-	case ".txt":
-		log.Info("txt file")
-		err = transcode(addHello, uploadObject, uploadObject)
-		if err != nil {
-			log.WithError(err).Error("failed to process txt file")
-			return "", err
-		}
 	case ".png":
 		log.Info("png file")
 		err = transcode(pngquantprocess, uploadObject, uploadObject)
@@ -114,29 +107,6 @@ func handler(ctx context.Context, evt S3PostSNS) (string, error) {
 	}
 
 	return "", nil
-}
-
-func addHello(src string, dst string) (err error) {
-	content, err := ioutil.ReadFile(src)
-	if err != nil {
-		log.WithError(err).Error("error reading")
-		return err
-	}
-
-	var out []byte
-	path, err := exec.LookPath("./hello/hello")
-	if err != nil {
-		log.WithError(err).Error("no hello binary found")
-		return err
-	}
-	out, err = exec.Command(path).CombinedOutput()
-	if err != nil {
-		log.WithError(err).Errorf("hello failed: %s", out)
-		return err
-	}
-
-	err = ioutil.WriteFile(dst, append(content, out...), 0644)
-	return err
 }
 
 func put(src string, dst s3post.S3upload) (err error) {
@@ -227,7 +197,7 @@ func transcode(fn convert, srcObject s3post.S3upload, dstObject s3post.S3upload)
 	log.Infof("Transcode size: %s -> %s", size(src), size(dst))
 
 	if err != nil {
-		log.WithError(err).Error("failed to add hello")
+		log.WithError(err).Error("failed to transcode")
 		return err
 	}
 
