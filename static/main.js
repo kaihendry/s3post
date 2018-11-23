@@ -38,12 +38,14 @@ function fileSelected () {
   fd.append('Content-Type', file.type)
   fd.append('file', f.files[0])
 
+  // Fetch doesn't support progress events yet
+  // TODO: How to prevent browser from breaking upload whilst still in progress!
   window.fetch(`https://s3-${REGION}.amazonaws.com/${BUCKET}`, { method: 'POST', body: fd }).then(function (res) {
     if (res.ok) {
-      // Notify me via SNS of a successful upload
-      var feedback = {}
-      feedback['msg'] = `//${BUCKET}/${key}`
-      window.fetch('https://eb1tv85d00.execute-api.ap-southeast-1.amazonaws.com/prod', { method: 'POST', body: JSON.stringify(feedback) }).then(function (res) {
+      // Notify NOTIFY_TOPIC via SNS of a successful upload
+      window.fetch('/notify', { method: 'POST',
+        body: JSON.stringify({URL: `https://${BUCKET}/${key}`, Bucket: BUCKET, Key: key, ContentType: file.type})
+      }).then(function (res) {
         if (res.ok) {
           console.log(res)
         } else {

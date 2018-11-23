@@ -4,6 +4,7 @@ import (
 	"crypto/hmac"
 	"crypto/sha1"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -12,7 +13,12 @@ import (
 	"html/template"
 
 	"github.com/apex/log"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/aws/endpoints"
+	"github.com/aws/aws-sdk-go-v2/aws/external"
+	"github.com/aws/aws-sdk-go-v2/service/sns"
 	"github.com/gorilla/mux"
+	s3post "github.com/kaihendry/s3post/struct"
 )
 
 var views = template.Must(template.ParseGlob("templates/*.tmpl"))
@@ -23,6 +29,7 @@ func main() {
 
 	app.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("./static/"))))
 	app.HandleFunc("/", handleIndex).Methods("GET")
+	app.HandleFunc("/notify", handleNotify).Methods("POST")
 	app.HandleFunc("/setpassword", submit).Methods("POST")
 	app.HandleFunc("/password", passwordprompt).Methods("GET")
 
@@ -41,7 +48,7 @@ func submit(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, &http.Cookie{
 		Name:    "password",
 		Value:   password,
-		Expires: time.Now().Add(8760 * time.Hour),
+		Expires: time.Now().Add(8760 * time.Hour), // Expire in a year?
 	})
 
 	http.Redirect(w, r, "/", http.StatusFound)
@@ -73,6 +80,7 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 
 	exp := time.Now().UTC().Add(time.Second * time.Duration(60))
 
+	// TODO model the policy in a Golang struct
 	policy := fmt.Sprintf(`{"expiration": "%s",
 	"conditions": [
 	{ "acl": "public-read" },
@@ -97,4 +105,53 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 		"B64Policy": b64policy,
 		"Signature": signature,
 	})
+}
+
+func handleNotify(w http.ResponseWriter, r *http.Request) {
+
+	var upload s3post.S3upload
+
+	err := json.NewDecoder(r.Body).Decode(&upload)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	ctx := log.WithFields(log.Fields{
+		"reqid": r.Header.Get("X-Request-Id"),
+		"UA":    r.Header.Get("User-Agent"),
+		"Key":   upload.Key,
+	})
+	ctx.Info("Parsed payload")
+
+	topic := os.Getenv("NOTIFY_TOPIC")
+	if topic == "" {
+		log.Warn("NOTIFY_TOPIC environment not setup")
+		http.Error(w, fmt.Sprintf("Please tell the Administrator that the notification topic is not setup"), http.StatusInternalServerError)
+		return
+	}
+
+	cfg, err := external.LoadDefaultAWSConfig(external.WithSharedConfigProfile("mine"))
+	if err != nil {
+		log.WithError(err).Fatal("setting up credentials")
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	cfg.Region = endpoints.ApSoutheast1RegionID
+
+	uploadJSON, _ := json.MarshalIndent(upload, "", "\n")
+
+	client := sns.New(cfg)
+	req := client.PublishRequest(&sns.PublishInput{
+		TopicArn: aws.String(topic),
+		Message:  aws.String(string(uploadJSON)),
+	})
+	resp, err := req.Send()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	ctx.Info("Sent")
+	fmt.Fprintf(w, "%s", resp)
 }

@@ -9,6 +9,7 @@ Requires the following environment variables to be set:
 * REGION e.g. ap-southeast-1, where the bucket is located
 * UPLOAD_ID the AWS_ACCESS_KEY_ID for uploading to the bucket only
 * UPLOAD_SECRET the secret AWS_SECRET_ACCESS_KEY counterpart to the restricted AWS_ACCESS_KEY_ID
+* NOTIFY_TOPIC SNS topic that publishes the key of the upload
 
 # S3 policy for restricting bucket upload
 
