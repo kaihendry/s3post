@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -18,11 +19,14 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/aws/external"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/sns"
 	humanize "github.com/dustin/go-humanize"
 	s3post "github.com/kaihendry/s3post/struct"
 )
 
 type convert func(src string, dst string) error
+
+var cfg aws.Config
 
 type S3PostSNS struct {
 	Records []struct {
@@ -47,6 +51,7 @@ type S3PostSNS struct {
 }
 
 func main() {
+	cfg, _ = external.LoadDefaultAWSConfig(external.WithSharedConfigProfile("mine"))
 	lambda.Start(handler)
 }
 
@@ -62,6 +67,8 @@ func handler(ctx context.Context, evt S3PostSNS) (string, error) {
 	log.WithFields(log.Fields{
 		"uploadObject": uploadObject,
 	}).Info("switch")
+
+	var processedURL string
 
 	switch mediatype := strings.ToLower(path.Ext(uploadObject.Key)); mediatype {
 	case ".txt":
@@ -81,14 +88,29 @@ func handler(ctx context.Context, evt S3PostSNS) (string, error) {
 	case ".mov":
 		log.Info("mov file")
 		mp4Object := uploadObject
-		mp4Object.Key = mp4Object.Key + ".mp4"
+		mp4Object.Key = mp4Object.Key[0:len(mp4Object.Key)-len(mediatype)] + ".mp4"
+		mp4Object.URL = mp4Object.URL[0:len(mp4Object.URL)-len(mediatype)] + ".mp4"
+		mp4Object.ContentType = "video/mp4"
 		err = transcode(ffmpegprocess, uploadObject, mp4Object)
 		if err != nil {
-			log.WithError(err).Error("failed to pngquant png file")
+			log.WithError(err).Error("failed to ffmpeg mov file")
 			return "", err
 		}
+		processedURL = mp4Object.URL
 	default:
 		log.Warnf("unrecognized %s", mediatype)
+	}
+
+	if processedURL != "" {
+		client := sns.New(cfg)
+		req := client.PublishRequest(&sns.PublishInput{
+			TopicArn: aws.String(os.Getenv("TOPIC")),
+			Message:  aws.String(processedURL),
+		})
+		_, err := req.Send()
+		if err != nil {
+			return "", err
+		}
 	}
 
 	return "", nil
@@ -119,11 +141,6 @@ func addHello(src string, dst string) (err error) {
 
 func put(src string, dst s3post.S3upload) (err error) {
 	log.Infof("Putting %s on %v", src, dst)
-	cfg, err := external.LoadDefaultAWSConfig(external.WithSharedConfigProfile("mine"))
-	if err != nil {
-		return err
-	}
-
 	svc := s3.New(cfg)
 
 	f, err := os.Open(src)
@@ -152,10 +169,6 @@ func put(src string, dst s3post.S3upload) (err error) {
 }
 
 func get(src s3post.S3upload, dst string) (err error) {
-	cfg, err := external.LoadDefaultAWSConfig(external.WithSharedConfigProfile("mine"))
-	if err != nil {
-		return err
-	}
 
 	svc := s3.New(cfg)
 
@@ -185,7 +198,8 @@ func get(src s3post.S3upload, dst string) (err error) {
 
 func transcode(fn convert, srcObject s3post.S3upload, dstObject s3post.S3upload) (err error) {
 
-	srctmpfile, err := ioutil.TempFile("", "transcodeme")
+	// foo to get tempfile ending in foo$
+	srctmpfile, err := ioutil.TempFile("", "*"+filepath.Ext(srcObject.Key))
 	if err != nil {
 		log.WithError(err).Fatal("failed to create temp input file")
 		return err
@@ -200,13 +214,13 @@ func transcode(fn convert, srcObject s3post.S3upload, dstObject s3post.S3upload)
 		return err
 	}
 
-	tmpfile, err := ioutil.TempFile("", "transcoded")
+	tmpfile, err := ioutil.TempFile("", "*"+filepath.Ext(dstObject.Key))
 	if err != nil {
 		log.WithError(err).Error("failed to create temp output file")
 		return err
 	}
 
-	dst := tmpfile.Name() + filepath.Ext(dstObject.Key)
+	dst := tmpfile.Name()
 	defer os.Remove(tmpfile.Name())
 
 	err = fn(src, dst)
@@ -228,18 +242,37 @@ func transcode(fn convert, srcObject s3post.S3upload, dstObject s3post.S3upload)
 }
 
 func ffmpegprocess(src string, dst string) (err error) {
-	var out []byte
 	path, err := exec.LookPath("./ffmpeg/ffmpeg")
 	if err != nil {
 		log.WithError(err).Error("no ffmpeg binary found")
 		return err
 	}
-	log.Info("Launching ffmpeg")
-	out, err = exec.Command(path, "-y", "-i", src, "-movflags", "+faststart", "-c:v", "libx264", dst).CombinedOutput()
+	log.Infof("Launching ffmpeg: %s -> %s", src, dst)
+	cmd := exec.Command(path, "-y", "-i", src, "-movflags", "+faststart", "-c:v", "libx264", dst)
+	// create a pipe for the output of the script
+	// https://stackoverflow.com/a/48381051/4534
+	cmdReader, err := cmd.StderrPipe()
 	if err != nil {
-		log.WithError(err).Errorf("ffmpeg failed: %s", out)
 		return err
 	}
+
+	scanner := bufio.NewScanner(cmdReader)
+	go func() {
+		for scanner.Scan() {
+			log.Debugf("\t > %s\n", scanner.Text())
+		}
+	}()
+
+	err = cmd.Start()
+	if err != nil {
+		return err
+	}
+
+	err = cmd.Wait()
+	if err != nil {
+		return err
+	}
+
 	return err
 }
 

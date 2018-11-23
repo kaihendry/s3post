@@ -2,8 +2,10 @@
   "name": "s3transcode",
   "description": "Transcoding in lambda",
   "profile": "mine",
-  "memory": 128,
-  "timeout": 300,
+  "memory": 3000,
+  "timeout": 600,
   "role": "arn:aws:iam::407461997746:role/s3transcode_lambda_function",
-  "environment": {}
+  "environment": {
+    "TOPIC": "arn:aws:sns:ap-southeast-1:407461997746:s3postprocessed"
+  }
 }
