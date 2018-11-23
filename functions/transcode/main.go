@@ -17,8 +17,11 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/aws/external"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	humanize "github.com/dustin/go-humanize"
 	s3post "github.com/kaihendry/s3post/struct"
 )
+
+type convert func(src string, dst string) error
 
 type S3PostSNS struct {
 	Records []struct {
@@ -62,14 +65,14 @@ func handler(ctx context.Context, evt S3PostSNS) (string, error) {
 	switch mediatype := strings.ToLower(path.Ext(uploadObject.Key)); mediatype {
 	case ".txt":
 		log.Info("txt file")
-		err = sayhello(uploadObject, uploadObject)
+		err = transcode(addHello, uploadObject, uploadObject)
 		if err != nil {
 			log.WithError(err).Error("failed to process txt file")
 			return "", err
 		}
 	case ".png":
 		log.Info("png file")
-		err = pngquant(uploadObject, uploadObject)
+		err = transcode(pngquantprocess, uploadObject, uploadObject)
 		if err != nil {
 			log.WithError(err).Error("failed to pngquant png file")
 			return "", err
@@ -170,7 +173,7 @@ func get(src s3post.S3upload, dst string) (err error) {
 	return err
 }
 
-func sayhello(srcObject s3post.S3upload, dstObject s3post.S3upload) (err error) {
+func transcode(fn convert, srcObject s3post.S3upload, dstObject s3post.S3upload) (err error) {
 
 	srctmpfile, err := ioutil.TempFile("", "transcodeme")
 	if err != nil {
@@ -196,50 +199,8 @@ func sayhello(srcObject s3post.S3upload, dstObject s3post.S3upload) (err error) 
 	dst := tmpfile.Name()
 	defer os.Remove(tmpfile.Name())
 
-	err = addHello(src, dst)
-
-	if err != nil {
-		log.WithError(err).Error("failed to add hello")
-		return err
-	}
-
-	err = put(dst, dstObject)
-	if err != nil {
-		log.WithError(err).Error("failed to put")
-		return err
-	}
-
-	return err
-
-}
-
-func pngquant(srcObject s3post.S3upload, dstObject s3post.S3upload) (err error) {
-
-	srctmpfile, err := ioutil.TempFile("", "transcodeme")
-	if err != nil {
-		log.WithError(err).Fatal("failed to create temp input file")
-		return err
-	}
-
-	src := srctmpfile.Name()
-	err = get(srcObject, src)
-	defer os.Remove(srctmpfile.Name())
-
-	if err != nil {
-		log.WithError(err).Error("failed to retrieve src file to lambda")
-		return err
-	}
-
-	tmpfile, err := ioutil.TempFile("", "transcoded")
-	if err != nil {
-		log.WithError(err).Error("failed to create temp output file")
-		return err
-	}
-
-	dst := tmpfile.Name()
-	defer os.Remove(tmpfile.Name())
-
-	err = pngquantprocess(src, dst)
+	err = fn(src, dst)
+	log.Infof("Transcode size: %s -> %s", size(src), size(dst))
 
 	if err != nil {
 		log.WithError(err).Error("failed to add hello")
@@ -269,4 +230,9 @@ func pngquantprocess(src string, dst string) (err error) {
 		return err
 	}
 	return err
+}
+
+func size(file string) string {
+	stats, _ := os.Stat(file)
+	return humanize.Bytes(uint64(stats.Size()))
 }
