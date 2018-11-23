@@ -1,9 +1,12 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
+	"io"
+	"io/ioutil"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"time"
@@ -60,37 +63,20 @@ func handler(ctx context.Context, evt S3PostSNS) (string, error) {
 	switch suffix {
 	case ".txt":
 		log.Info("txt file")
-		var out []byte
-		path, err := exec.LookPath("./hello/hello")
+		src, err := get(uploadObject)
 		if err != nil {
-			log.WithError(err).Error("no hello binary found")
+			log.WithError(err).Error("failed to retrieve src file to lambda")
 			return "", err
 		}
-		out, err = exec.Command(path).CombinedOutput()
+		dst := "/tmp/newhello"
+		err = addHello(src, dst)
 		if err != nil {
-			log.WithError(err).Errorf("hello failed: %s", out)
-			return string(out), err
-		}
-
-		cfg, err := external.LoadDefaultAWSConfig(external.WithSharedConfigProfile("mine"))
-		if err != nil {
+			log.WithError(err).Error("failed to add hello")
 			return "", err
 		}
-
-		svc := s3.New(cfg)
-
-		putparams := &s3.PutObjectInput{
-			Bucket:      aws.String(uploadObject.Bucket),
-			Body:        bytes.NewReader(out),
-			Key:         aws.String(uploadObject.Key),
-			ACL:         s3.ObjectCannedACLPublicRead,
-			ContentType: aws.String("text/plain; charset=UTF-8"),
-		}
-
-		req := svc.PutObjectRequest(putparams)
-		_, err = req.Send()
+		err = put(dst, uploadObject)
 		if err != nil {
-			log.WithError(err).Fatal("failed to upload to s3")
+			log.WithError(err).Error("failed to put")
 			return "", err
 		}
 
@@ -99,4 +85,94 @@ func handler(ctx context.Context, evt S3PostSNS) (string, error) {
 	}
 
 	return "", nil
+}
+
+func addHello(src string, dst string) (err error) {
+	content, err := ioutil.ReadFile(src)
+	if err != nil {
+		log.WithError(err).Error("error reading")
+		return err
+	}
+
+	var out []byte
+	path, err := exec.LookPath("./hello/hello")
+	if err != nil {
+		log.WithError(err).Error("no hello binary found")
+		return err
+	}
+	out, err = exec.Command(path).CombinedOutput()
+	if err != nil {
+		log.WithError(err).Errorf("hello failed: %s", out)
+		return err
+	}
+
+	err = ioutil.WriteFile(dst, append(content, out...), 0644)
+	return err
+}
+
+func put(src string, dst s3post.S3upload) (err error) {
+	log.Infof("Putting %s on %v", src, dst)
+	cfg, err := external.LoadDefaultAWSConfig(external.WithSharedConfigProfile("mine"))
+	if err != nil {
+		return err
+	}
+
+	svc := s3.New(cfg)
+
+	f, err := os.Open(src)
+	if err != nil {
+		log.WithError(err).Fatal("unable to open src")
+		return err
+	}
+	defer f.Close()
+
+	putparams := &s3.PutObjectInput{
+		Bucket:      aws.String(dst.Bucket),
+		Body:        aws.ReadSeekCloser(f),
+		Key:         aws.String(dst.Key),
+		ACL:         s3.ObjectCannedACLPublicRead,
+		ContentType: aws.String(fmt.Sprintf("%s; charset=UTF-8", dst.ContentType)),
+	}
+
+	req := svc.PutObjectRequest(putparams)
+	_, err = req.Send()
+	if err != nil {
+		log.WithError(err).Fatal("failed to upload to s3")
+		return err
+	}
+
+	return nil
+}
+
+func get(src s3post.S3upload) (dst string, err error) {
+	cfg, err := external.LoadDefaultAWSConfig(external.WithSharedConfigProfile("mine"))
+	if err != nil {
+		return "", err
+	}
+
+	svc := s3.New(cfg)
+
+	input := &s3.GetObjectInput{
+		Bucket: aws.String(src.Bucket),
+		Key:    aws.String(src.Key),
+	}
+
+	req := svc.GetObjectRequest(input)
+	res, err := req.Send()
+	if err != nil {
+		log.WithError(err).Fatal("failed to get file")
+		return "", err
+	}
+
+	dst = "/tmp/transcoded"
+	outFile, err := os.Create(dst)
+	if err != nil {
+		log.WithError(err).Fatal("failed to create output file")
+		return "", err
+	}
+
+	defer outFile.Close()
+	_, err = io.Copy(outFile, res.Body)
+
+	return dst, err
 }
