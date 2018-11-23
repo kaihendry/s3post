@@ -67,6 +67,13 @@ func handler(ctx context.Context, evt S3PostSNS) (string, error) {
 			log.WithError(err).Error("failed to process txt file")
 			return "", err
 		}
+	case ".png":
+		log.Info("png file")
+		err = pngquant(uploadObject, uploadObject)
+		if err != nil {
+			log.WithError(err).Error("failed to pngquant png file")
+			return "", err
+		}
 	default:
 		log.Warnf("unrecognized %s", mediatype)
 	}
@@ -204,4 +211,62 @@ func sayhello(srcObject s3post.S3upload, dstObject s3post.S3upload) (err error) 
 
 	return err
 
+}
+
+func pngquant(srcObject s3post.S3upload, dstObject s3post.S3upload) (err error) {
+
+	srctmpfile, err := ioutil.TempFile("", "transcodeme")
+	if err != nil {
+		log.WithError(err).Fatal("failed to create temp input file")
+		return err
+	}
+
+	src := srctmpfile.Name()
+	err = get(srcObject, src)
+	defer os.Remove(srctmpfile.Name())
+
+	if err != nil {
+		log.WithError(err).Error("failed to retrieve src file to lambda")
+		return err
+	}
+
+	tmpfile, err := ioutil.TempFile("", "transcoded")
+	if err != nil {
+		log.WithError(err).Error("failed to create temp output file")
+		return err
+	}
+
+	dst := tmpfile.Name()
+	defer os.Remove(tmpfile.Name())
+
+	err = pngquantprocess(src, dst)
+
+	if err != nil {
+		log.WithError(err).Error("failed to add hello")
+		return err
+	}
+
+	err = put(dst, dstObject)
+	if err != nil {
+		log.WithError(err).Error("failed to put")
+		return err
+	}
+
+	return err
+
+}
+
+func pngquantprocess(src string, dst string) (err error) {
+	var out []byte
+	path, err := exec.LookPath("./pngquant/pngquant")
+	if err != nil {
+		log.WithError(err).Error("no pngquant binary found")
+		return err
+	}
+	out, err = exec.Command(path, "-f", src, "-o", dst).CombinedOutput()
+	if err != nil {
+		log.WithError(err).Errorf("pngquant failed: %s", out)
+		return err
+	}
+	return err
 }
