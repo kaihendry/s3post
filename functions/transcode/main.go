@@ -8,7 +8,8 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
-	"path/filepath"
+	"path"
+	"strings"
 	"time"
 
 	"github.com/apex/log"
@@ -54,54 +55,20 @@ func handler(ctx context.Context, evt S3PostSNS) (string, error) {
 		return "", err
 	}
 
-	suffix := filepath.Ext(uploadObject.Key)
 	log.WithFields(log.Fields{
-		"suffix":       suffix,
 		"uploadObject": uploadObject,
 	}).Info("switch")
 
-	switch suffix {
+	switch mediatype := strings.ToLower(path.Ext(uploadObject.Key)); mediatype {
 	case ".txt":
 		log.Info("txt file")
-
-		srctmpfile, err := ioutil.TempFile("", "transcodeme")
+		err = sayhello(uploadObject, uploadObject)
 		if err != nil {
-			log.WithError(err).Fatal("failed to create temp input file")
+			log.WithError(err).Error("failed to process txt file")
 			return "", err
 		}
-
-		src := srctmpfile.Name()
-		err = get(uploadObject, src)
-		defer os.Remove(srctmpfile.Name())
-
-		if err != nil {
-			log.WithError(err).Error("failed to retrieve src file to lambda")
-			return "", err
-		}
-
-		tmpfile, err := ioutil.TempFile("", "transcoded")
-		if err != nil {
-			log.WithError(err).Error("failed to create temp output file")
-			return "", err
-		}
-
-		dst := tmpfile.Name()
-		defer os.Remove(tmpfile.Name())
-
-		err = addHello(src, dst)
-
-		if err != nil {
-			log.WithError(err).Error("failed to add hello")
-			return "", err
-		}
-		err = put(dst, uploadObject)
-		if err != nil {
-			log.WithError(err).Error("failed to put")
-			return "", err
-		}
-
 	default:
-		log.Warn("unrecognized suffix")
+		log.Warnf("unrecognized %s", mediatype)
 	}
 
 	return "", nil
@@ -194,4 +161,47 @@ func get(src s3post.S3upload, dst string) (err error) {
 	_, err = io.Copy(outFile, res.Body)
 
 	return err
+}
+
+func sayhello(srcObject s3post.S3upload, dstObject s3post.S3upload) (err error) {
+
+	srctmpfile, err := ioutil.TempFile("", "transcodeme")
+	if err != nil {
+		log.WithError(err).Fatal("failed to create temp input file")
+		return err
+	}
+
+	src := srctmpfile.Name()
+	err = get(srcObject, src)
+	defer os.Remove(srctmpfile.Name())
+
+	if err != nil {
+		log.WithError(err).Error("failed to retrieve src file to lambda")
+		return err
+	}
+
+	tmpfile, err := ioutil.TempFile("", "transcoded")
+	if err != nil {
+		log.WithError(err).Error("failed to create temp output file")
+		return err
+	}
+
+	dst := tmpfile.Name()
+	defer os.Remove(tmpfile.Name())
+
+	err = addHello(src, dst)
+
+	if err != nil {
+		log.WithError(err).Error("failed to add hello")
+		return err
+	}
+
+	err = put(dst, dstObject)
+	if err != nil {
+		log.WithError(err).Error("failed to put")
+		return err
+	}
+
+	return err
+
 }
