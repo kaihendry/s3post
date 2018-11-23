@@ -63,19 +63,33 @@ func handler(ctx context.Context, evt S3PostSNS) (string, error) {
 	switch suffix {
 	case ".txt":
 		log.Info("txt file")
-		src, err := get(uploadObject)
+
+		srctmpfile, err := ioutil.TempFile("", "transcodeme")
+		if err != nil {
+			log.WithError(err).Fatal("failed to create temp input file")
+			return "", err
+		}
+
+		src := srctmpfile.Name()
+		err = get(uploadObject, src)
+		defer os.Remove(srctmpfile.Name())
+
 		if err != nil {
 			log.WithError(err).Error("failed to retrieve src file to lambda")
 			return "", err
 		}
+
 		tmpfile, err := ioutil.TempFile("", "transcoded")
 		if err != nil {
 			log.WithError(err).Error("failed to create temp output file")
 			return "", err
 		}
+
 		dst := tmpfile.Name()
 		defer os.Remove(tmpfile.Name())
+
 		err = addHello(src, dst)
+
 		if err != nil {
 			log.WithError(err).Error("failed to add hello")
 			return "", err
@@ -150,10 +164,10 @@ func put(src string, dst s3post.S3upload) (err error) {
 	return nil
 }
 
-func get(src s3post.S3upload) (dst string, err error) {
+func get(src s3post.S3upload, dst string) (err error) {
 	cfg, err := external.LoadDefaultAWSConfig(external.WithSharedConfigProfile("mine"))
 	if err != nil {
-		return "", err
+		return err
 	}
 
 	svc := s3.New(cfg)
@@ -167,24 +181,17 @@ func get(src s3post.S3upload) (dst string, err error) {
 	res, err := req.Send()
 	if err != nil {
 		log.WithError(err).Fatal("failed to get file")
-		return "", err
+		return err
 	}
 
-	tmpfile, err := ioutil.TempFile("", "transcodeme")
-	if err != nil {
-		log.WithError(err).Fatal("failed to create temp input file")
-		return "", err
-	}
-
-	dst = tmpfile.Name()
 	outFile, err := os.Create(dst)
 	if err != nil {
 		log.WithError(err).Fatal("failed to create output file")
-		return "", err
+		return err
 	}
 
 	defer outFile.Close()
 	_, err = io.Copy(outFile, res.Body)
 
-	return dst, err
+	return err
 }
