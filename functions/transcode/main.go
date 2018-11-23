@@ -68,7 +68,13 @@ func handler(ctx context.Context, evt S3PostSNS) (string, error) {
 			log.WithError(err).Error("failed to retrieve src file to lambda")
 			return "", err
 		}
-		dst := "/tmp/newhello"
+		tmpfile, err := ioutil.TempFile("", "transcoded")
+		if err != nil {
+			log.WithError(err).Error("failed to create temp output file")
+			return "", err
+		}
+		dst := tmpfile.Name()
+		defer os.Remove(tmpfile.Name())
 		err = addHello(src, dst)
 		if err != nil {
 			log.WithError(err).Error("failed to add hello")
@@ -164,7 +170,13 @@ func get(src s3post.S3upload) (dst string, err error) {
 		return "", err
 	}
 
-	dst = "/tmp/transcoded"
+	tmpfile, err := ioutil.TempFile("", "transcodeme")
+	if err != nil {
+		log.WithError(err).Fatal("failed to create temp input file")
+		return "", err
+	}
+
+	dst = tmpfile.Name()
 	outFile, err := os.Create(dst)
 	if err != nil {
 		log.WithError(err).Fatal("failed to create output file")
