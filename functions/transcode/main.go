@@ -12,7 +12,6 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/apex/log"
 	"github.com/aws/aws-lambda-go/lambda"
@@ -21,6 +20,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/sns"
 	humanize "github.com/dustin/go-humanize"
+	"github.com/kaihendry/aws-lambda-go/events"
 	s3post "github.com/kaihendry/s3post/struct"
 )
 
@@ -28,38 +28,16 @@ type convert func(src string, dst string) error
 
 var cfg aws.Config
 
-type S3PostSNS struct {
-	Records []struct {
-		EventSource          string `json:"EventSource"`
-		EventVersion         string `json:"EventVersion"`
-		EventSubscriptionArn string `json:"EventSubscriptionArn"`
-		Sns                  struct {
-			Type              string      `json:"Type"`
-			MessageID         string      `json:"MessageId"`
-			TopicArn          string      `json:"TopicArn"`
-			Subject           interface{} `json:"Subject"`
-			Message           string      `json:"Message"`
-			Timestamp         time.Time   `json:"Timestamp"`
-			SignatureVersion  string      `json:"SignatureVersion"`
-			Signature         string      `json:"Signature"`
-			SigningCertURL    string      `json:"SigningCertUrl"`
-			UnsubscribeURL    string      `json:"UnsubscribeUrl"`
-			MessageAttributes struct {
-			} `json:"MessageAttributes"`
-		} `json:"Sns"`
-	} `json:"Records"`
-}
-
 func main() {
 	cfg, _ = external.LoadDefaultAWSConfig(external.WithSharedConfigProfile("mine"))
 	lambda.Start(handler)
 }
 
-func handler(ctx context.Context, evt S3PostSNS) (string, error) {
+func handler(ctx context.Context, evt events.SNSEvent) (string, error) {
 
 	var uploadObject s3post.S3upload
 
-	err := json.Unmarshal([]byte(evt.Records[0].Sns.Message), &uploadObject)
+	err := json.Unmarshal([]byte(evt.Records[0].SNS.Message), &uploadObject)
 	if err != nil {
 		return "", err
 	}
