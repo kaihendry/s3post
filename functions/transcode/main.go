@@ -35,6 +35,8 @@ func main() {
 
 func handler(ctx context.Context, evt events.SNSEvent) (string, error) {
 
+	log.Infof("%+v", evt)
+
 	var uploadObject s3post.S3upload
 
 	err := json.Unmarshal([]byte(evt.Records[0].SNS.Message), &uploadObject)
@@ -54,6 +56,13 @@ func handler(ctx context.Context, evt events.SNSEvent) (string, error) {
 		err = transcode(pngquantprocess, uploadObject, uploadObject)
 		if err != nil {
 			log.WithError(err).Error("failed to pngquant png file")
+			return "", err
+		}
+	case ".jpg":
+		log.Info("jpg file")
+		err = transcode(cjpegprocess, uploadObject, uploadObject)
+		if err != nil {
+			log.WithError(err).Error("failed to cjpeg jpg file")
 			return "", err
 		}
 	case ".mov":
@@ -234,6 +243,21 @@ func pngquantprocess(src string, dst string) (err error) {
 	out, err = exec.Command(path, "-f", src, "-o", dst).CombinedOutput()
 	if err != nil {
 		log.WithError(err).Errorf("pngquant failed: %s", out)
+		return err
+	}
+	return err
+}
+
+func cjpegprocess(src string, dst string) (err error) {
+	var out []byte
+	path, err := exec.LookPath("./cjpeg-static")
+	if err != nil {
+		log.WithError(err).Error("no cjpeg-static binary found")
+		return err
+	}
+	out, err = exec.Command(path, "-quality", "80", "-outfile", dst, src).CombinedOutput()
+	if err != nil {
+		log.WithError(err).Errorf("cjpeg-static failed: %s", out)
 		return err
 	}
 	return err

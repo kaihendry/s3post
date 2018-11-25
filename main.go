@@ -109,6 +109,8 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 
 func handleNotify(w http.ResponseWriter, r *http.Request) {
 
+	// TODO Check cookie?
+
 	var upload s3post.S3upload
 
 	err := json.NewDecoder(r.Body).Decode(&upload)
