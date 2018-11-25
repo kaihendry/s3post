@@ -59,6 +59,7 @@ func handler(ctx context.Context, evt events.SNSEvent) (string, error) {
 			return "", err
 		}
 	case ".jpg":
+	case ".jpeg":
 		log.Info("jpg file")
 		err = transcode(cjpegprocess, uploadObject, uploadObject)
 		if err != nil {
