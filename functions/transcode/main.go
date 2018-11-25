@@ -199,7 +199,7 @@ func transcode(fn convert, srcObject s3post.S3upload, dstObject s3post.S3upload)
 }
 
 func ffmpegprocess(src string, dst string) (err error) {
-	path, err := exec.LookPath("./ffmpeg/ffmpeg")
+	path, err := exec.LookPath("./ffmpeg")
 	if err != nil {
 		log.WithError(err).Error("no ffmpeg binary found")
 		return err
@@ -235,7 +235,7 @@ func ffmpegprocess(src string, dst string) (err error) {
 
 func pngquantprocess(src string, dst string) (err error) {
 	var out []byte
-	path, err := exec.LookPath("./pngquant/pngquant")
+	path, err := exec.LookPath("./pngquant")
 	if err != nil {
 		log.WithError(err).Error("no pngquant binary found")
 		return err
