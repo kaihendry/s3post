@@ -21,10 +21,6 @@ function fileSelected () {
 
     var fileSize = 0
     if (file.size > 1024 * 1024) fileSize = (Math.round(file.size * 100 / (1024 * 1024)) / 100).toString() + 'MB'; else fileSize = (Math.round(file.size * 100 / 1024) / 100).toString() + 'KB'
-
-    document.getElementById('fileName').innerHTML = `<a href="//${BUCKET}/${key}">Name: ${key}</a>`
-    document.getElementById('fileSize').innerHTML = `Size: ${fileSize}`
-    document.getElementById('fileType').innerHTML = `Type: ${file.type}`
   }
 
   const fd = new window.FormData()
@@ -42,6 +38,10 @@ function fileSelected () {
   // TODO: How to prevent browser from breaking upload whilst still in progress!
   window.fetch(`https://s3-${REGION}.amazonaws.com/${BUCKET}`, { method: 'POST', body: fd }).then(function (res) {
     if (res.ok) {
+      document.getElementById('fileName').innerHTML = `<a href="//${BUCKET}/${key}">Name: ${key}</a>`
+      document.getElementById('fileSize').innerHTML = `Size: ${fileSize}`
+      document.getElementById('fileType').innerHTML = `Type: ${file.type}`
+
       // Notify NOTIFY_TOPIC via SNS of a successful upload
       window.fetch('/notify', { method: 'POST',
         body: JSON.stringify({URL: `https://${BUCKET}/${key}`, Bucket: BUCKET, Key: key, ContentType: file.type})

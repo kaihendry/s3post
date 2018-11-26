@@ -58,8 +58,7 @@ func handler(ctx context.Context, evt events.SNSEvent) (string, error) {
 			log.WithError(err).Error("failed to pngquant png file")
 			return "", err
 		}
-	case ".jpg":
-	case ".jpeg":
+	case ".jpg", ".jpeg":
 		log.Info("jpg file")
 		err = transcode(cjpegprocess, uploadObject, uploadObject)
 		if err != nil {
