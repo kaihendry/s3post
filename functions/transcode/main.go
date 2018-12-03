@@ -48,30 +48,33 @@ func handler(ctx context.Context, evt events.SNSEvent) (string, error) {
 		"uploadObject": uploadObject,
 	}).Info("switch")
 
+	var info string
 	var processedURL string
 
 	switch mediatype := strings.ToLower(path.Ext(uploadObject.Key)); mediatype {
 	case ".png":
 		log.Info("png file")
-		err = transcode(pngquantprocess, uploadObject, uploadObject)
+		info, err = transcode(pngquantprocess, uploadObject, uploadObject)
 		if err != nil {
 			log.WithError(err).Error("failed to pngquant png file")
 			return "", err
 		}
+		processedURL = uploadObject.URL
 	case ".jpg", ".jpeg":
 		log.Info("jpg file")
-		err = transcode(cjpegprocess, uploadObject, uploadObject)
+		info, err = transcode(cjpegprocess, uploadObject, uploadObject)
 		if err != nil {
 			log.WithError(err).Error("failed to cjpeg jpg file")
 			return "", err
 		}
+		processedURL = uploadObject.URL
 	case ".mov":
 		log.Info("mov file")
 		mp4Object := uploadObject
 		mp4Object.Key = mp4Object.Key[0:len(mp4Object.Key)-len(mediatype)] + ".mp4"
 		mp4Object.URL = mp4Object.URL[0:len(mp4Object.URL)-len(mediatype)] + ".mp4"
 		mp4Object.ContentType = "video/mp4"
-		err = transcode(ffmpegprocess, uploadObject, mp4Object)
+		info, err = transcode(ffmpegprocess, uploadObject, mp4Object)
 		if err != nil {
 			log.WithError(err).Error("failed to ffmpeg mov file")
 			return "", err
@@ -85,7 +88,7 @@ func handler(ctx context.Context, evt events.SNSEvent) (string, error) {
 		client := sns.New(cfg)
 		req := client.PublishRequest(&sns.PublishInput{
 			TopicArn: aws.String(os.Getenv("TOPIC")),
-			Message:  aws.String(processedURL),
+			Message:  aws.String(fmt.Sprintf("%s\n%s", processedURL, info)),
 		})
 		_, err := req.Send()
 		if err != nil {
@@ -153,13 +156,13 @@ func get(src s3post.S3upload, dst string) (err error) {
 	return err
 }
 
-func transcode(fn convert, srcObject s3post.S3upload, dstObject s3post.S3upload) (err error) {
+func transcode(fn convert, srcObject s3post.S3upload, dstObject s3post.S3upload) (info string, err error) {
 
 	// foo to get tempfile ending in foo$
 	srctmpfile, err := ioutil.TempFile("", "*"+filepath.Ext(srcObject.Key))
 	if err != nil {
 		log.WithError(err).Fatal("failed to create temp input file")
-		return err
+		return "", err
 	}
 
 	src := srctmpfile.Name()
@@ -168,33 +171,32 @@ func transcode(fn convert, srcObject s3post.S3upload, dstObject s3post.S3upload)
 
 	if err != nil {
 		log.WithError(err).Error("failed to retrieve src file to lambda")
-		return err
+		return "", err
 	}
 
 	tmpfile, err := ioutil.TempFile("", "*"+filepath.Ext(dstObject.Key))
 	if err != nil {
 		log.WithError(err).Error("failed to create temp output file")
-		return err
+		return "", err
 	}
 
 	dst := tmpfile.Name()
 	defer os.Remove(tmpfile.Name())
 
 	err = fn(src, dst)
-	log.Infof("Transcode size: %s -> %s", size(src), size(dst))
 
 	if err != nil {
 		log.WithError(err).Error("failed to transcode")
-		return err
+		return "", err
 	}
 
 	err = put(dst, dstObject)
 	if err != nil {
 		log.WithError(err).Error("failed to put")
-		return err
+		return "", err
 	}
 
-	return err
+	return fmt.Sprintf("Transcode size: %s → %s", size(src), size(dst)), err
 
 }
 
