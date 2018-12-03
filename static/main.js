@@ -1,11 +1,20 @@
-function fileSelected () {
+document.addEventListener('DOMContentLoaded', function (event) {
+  var uploadFile = document.getElementById('uploadFile')
+  uploadFile.addEventListener('change', enableUpload, false)
+  function enableUpload () {
+    document.getElementById('uploadButton').disabled = false
+  }
+})
+
+function fileSelected (form) {
+  form.uploadButton.disabled = true
   const BUCKET = document.getElementById('BUCKET').innerHTML
   const UPLOAD_ID = document.getElementById('UPLOAD_ID').innerHTML
   const REGION = document.getElementById('REGION').innerHTML
   const Policy = document.getElementById('Policy').innerHTML
   const Signature = document.getElementById('Signature').innerHTML
 
-  const f = document.getElementById('file')
+  const f = document.getElementById('uploadFile')
   const file = f.files[0]
   let key
 
@@ -36,6 +45,7 @@ function fileSelected () {
 
   // Fetch doesn't support progress events yet
   // TODO: How to prevent browser from breaking upload whilst still in progress!
+
   window.fetch(`https://s3-${REGION}.amazonaws.com/${BUCKET}`, { method: 'POST', body: fd }).then(function (res) {
     if (res.ok) {
       document.getElementById('fileName').innerHTML = `<a href="//${BUCKET}/${key}">Name: ${key}</a>`

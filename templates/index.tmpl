@@ -2,13 +2,13 @@
 <html>
 <head>
 <title>Upload to AWS S3 {{ .Stage }}</title>
-<meta name=viewport content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 <meta name="robots" content="noindex">
 <style>
 /* http://stackoverflow.com/questions/36400558/ */
 body, input[type=submit] { font-size: x-large;   font-family: "Noto Serif", serif; }
 .inputs { display: flex; flex-direction: column; align-items: left; justify-content: left; }
-label { padding: 1em; margin: 0.3em; border: thin solid black; border-top-right-radius: 1em; }
+label { padding: 1em; margin: 0.3em; border: thick solid black;}
 dl { visibility: hidden }
 </style>
 <script src="static/main.js"></script>
@@ -26,8 +26,8 @@ dl { visibility: hidden }
 <strong>Optional:</strong> Upload file name
 <input type=text pattern="([0-9]|[A-Z]|[a-z]|[!\-_.*'\(\)])+" id=filename autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
 </label>
-<label>Upload file <input type=file required id=file></label>
-<input type=submit value="Upload">
+<label>Upload file <input id="uploadFile" type=file required></label>
+<input id="uploadButton" name="uploadButton" disabled type=submit value="Upload">
 </form>
 
 <dl>

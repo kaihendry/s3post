@@ -78,7 +78,8 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 
 	// https://docs.aws.amazon.com/AmazonS3/latest/API/sigv4-HTTPPOSTConstructPolicy.html
 
-	exp := time.Now().UTC().Add(time.Second * time.Duration(60))
+	// Expire in five minutes
+	expInFiveMinutes := time.Now().UTC().Add(time.Minute * 5)
 
 	// TODO model the policy in a Golang struct
 	policy := fmt.Sprintf(`{"expiration": "%s",
@@ -88,7 +89,7 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 	["starts-with", "$Content-Type", ""],
 	{ "bucket": "%s" }
 	]
-	}`, exp.Format("2006-01-02T15:04:05Z"), exp.Format("2006-01-02"), os.Getenv("BUCKET"))
+	}`, expInFiveMinutes.Format("2006-01-02T15:04:05Z"), expInFiveMinutes.Format("2006-01-02"), os.Getenv("BUCKET"))
 
 	b64policy := base64.StdEncoding.EncodeToString([]byte(policy))
 
@@ -141,7 +142,7 @@ func handleNotify(w http.ResponseWriter, r *http.Request) {
 	}
 	cfg.Region = endpoints.ApSoutheast1RegionID
 
-	uploadJSON, _ := json.MarshalIndent(upload, "", "\n")
+	uploadJSON, _ := json.MarshalIndent(upload, "", "   ")
 
 	client := sns.New(cfg)
 	req := client.PublishRequest(&sns.PublishInput{
