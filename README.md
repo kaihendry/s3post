@@ -26,7 +26,7 @@ Requires the following environment variables to be set:
 		]
 	}
 
-TODO is to implement a native Golang SDK
+TODO is to implement a native Golang SDK function without UPLOAD_ID/UPLOAD_SECRET
 [createPresignedPost](https://github.com/aws/aws-sdk-go-v2/issues/171)
 
 https://github.com/TTLabs/EvaporateJS is far too complex. [Alex

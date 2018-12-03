@@ -21,7 +21,14 @@ import (
 	s3post "github.com/kaihendry/s3post/struct"
 )
 
-var views = template.Must(template.ParseGlob("templates/*.tmpl"))
+var views = template.Must(template.ParseGlob("static/*.tmpl"))
+
+func init() {
+	if os.Getenv("PASSWORD") == "" {
+		log.Fatal("PASSWORD environment variable must be defined")
+		os.Exit(1)
+	}
+}
 
 func main() {
 	addr := ":" + os.Getenv("PORT")
