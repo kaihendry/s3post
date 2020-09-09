@@ -21,7 +21,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sns"
 	humanize "github.com/dustin/go-humanize"
 	"github.com/kaihendry/aws-lambda-go/events"
-	s3post "github.com/kaihendry/s3post/struct"
 )
 
 type convert func(src string, dst string) error
@@ -37,7 +36,12 @@ func handler(ctx context.Context, evt events.SNSEvent) (string, error) {
 
 	log.Infof("%+v", evt)
 
-	var uploadObject s3post.S3upload
+	uploadObject := struct {
+		Key         string `json:"Key"`
+		URL         string `json:"URL"`
+		Bucket      string `json:"Bucket"`
+		ContentType string `json:"ContentType"`
+	}{}
 
 	err := json.Unmarshal([]byte(evt.Records[0].SNS.Message), &uploadObject)
 	if err != nil {

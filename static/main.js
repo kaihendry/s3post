@@ -1,9 +1,14 @@
 document.addEventListener('DOMContentLoaded', function (event) {
   var uploadFile = document.getElementById('uploadFile')
+
   uploadFile.addEventListener('change', enableUpload, false)
   function enableUpload () {
     document.getElementById('uploadButton').disabled = false
   }
+
+  window.addEventListener('paste', e => {
+    uploadFile.files = e.clipboardData.files
+  })
 })
 
 function fileSelected (form) {

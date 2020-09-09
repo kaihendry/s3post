@@ -11,5 +11,50 @@
   },
   "error_pages": {
     "disable": true
-  }
+  },
+  "hooks": {
+    "build": "CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o server *.go"
+  },
+  "lambda": {
+    "policy": [
+      {
+        "Action": [
+          "sns:*"
+        ],
+        "Effect": "Allow",
+        "Resource": "*"
+      }
+    ]
+  },
+  "actions": [
+    {
+      "name": "email.backend",
+      "type": "email",
+      "emails": [
+        "hendry+s3post@iki.fi"
+      ]
+    }
+  ],
+  "alerts": [
+    {
+      "metric": "http.count",
+      "statistic": "sum",
+      "threshold": 100,
+      "action": "email.backend"
+    },
+    {
+      "metric": "http.5xx",
+      "statistic": "sum",
+      "threshold": 1,
+      "period": "1m",
+      "action": "email.backend"
+    },
+    {
+      "metric": "http.4xx",
+      "statistic": "sum",
+      "threshold": 50,
+      "period": "5m",
+      "action": "email.backend"
+    }
+  ]
 }

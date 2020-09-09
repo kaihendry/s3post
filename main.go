@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha1"
 	"encoding/base64"
@@ -14,12 +15,17 @@ import (
 
 	"github.com/apex/log"
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/aws/endpoints"
 	"github.com/aws/aws-sdk-go-v2/aws/external"
 	"github.com/aws/aws-sdk-go-v2/service/sns"
 	"github.com/gorilla/mux"
-	s3post "github.com/kaihendry/s3post/struct"
 )
+
+type S3upload struct {
+	Key         string `json:"Key"`
+	URL         string `json:"URL"`
+	Bucket      string `json:"Bucket"`
+	ContentType string `json:"ContentType"`
+}
 
 var views = template.Must(template.ParseGlob("static/*.tmpl"))
 
@@ -96,7 +102,9 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 	["starts-with", "$Content-Type", ""],
 	{ "bucket": "%s" }
 	]
-	}`, expInFiveMinutes.Format("2006-01-02T15:04:05Z"), expInFiveMinutes.Format("2006-01-02"), os.Getenv("BUCKET"))
+	}`, expInFiveMinutes.Format("2006-01-02T15:04:05Z"),
+		expInFiveMinutes.Format("2006-01-02"),
+		os.Getenv("BUCKET"))
 
 	b64policy := base64.StdEncoding.EncodeToString([]byte(policy))
 
@@ -117,9 +125,9 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 
 func handleNotify(w http.ResponseWriter, r *http.Request) {
 
-	// TODO Check cookie?
+	// TODO Check my cookie?
 
-	var upload s3post.S3upload
+	var upload S3upload
 
 	err := json.NewDecoder(r.Body).Decode(&upload)
 	if err != nil {
@@ -142,22 +150,30 @@ func handleNotify(w http.ResponseWriter, r *http.Request) {
 	}
 
 	cfg, err := external.LoadDefaultAWSConfig(external.WithSharedConfigProfile("mine"))
+	// cfg, err := external.LoadDefaultAWSConfig()
 	if err != nil {
 		log.WithError(err).Fatal("setting up credentials")
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	cfg.Region = endpoints.ApSoutheast1RegionID
+	cfg.Region = "ap-southeast-1"
 
-	uploadJSON, _ := json.MarshalIndent(upload, "", "   ")
+	uploadJSON, err := json.MarshalIndent(upload, "", "   ")
+	if err != nil {
+		ctx.WithError(err).Fatal("unable to marshall JSON")
+	}
 
 	client := sns.New(cfg)
 	req := client.PublishRequest(&sns.PublishInput{
 		TopicArn: aws.String(topic),
 		Message:  aws.String(string(uploadJSON)),
 	})
-	resp, err := req.Send()
+
+	ctx.Info("Attempting to send SNS")
+
+	resp, err := req.Send(context.Background())
 	if err != nil {
+		log.WithError(err).Warn("unable to send SNS")
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
