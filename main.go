@@ -4,15 +4,17 @@ import (
 	"context"
 	"crypto/hmac"
 	"crypto/sha1"
+	"embed"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"html/template"
+	"io/fs"
 	"net/http"
 	"os"
 	"time"
 
-	"html/template"
-
+	"github.com/apex/gateway/v2"
 	"github.com/apex/log"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/aws/external"
@@ -27,26 +29,35 @@ type S3upload struct {
 	ContentType string `json:"ContentType"`
 }
 
-var views = template.Must(template.ParseGlob("static/*.tmpl"))
+//go:embed static
+var staticFiles embed.FS
 
-func init() {
+var views = template.Must(template.ParseFS(staticFiles, "static/*.tmpl"))
+
+func main() {
 	if os.Getenv("PASSWORD") == "" {
 		log.Fatal("PASSWORD environment variable must be defined")
 		os.Exit(1)
 	}
-}
 
-func main() {
-	addr := ":" + os.Getenv("PORT")
+	staticSub, err := fs.Sub(staticFiles, "static")
+	if err != nil {
+		log.WithError(err).Fatal("failed to create static sub FS")
+	}
+
 	app := mux.NewRouter()
-
-	app.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("./static/"))))
+	app.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.FS(staticSub))))
 	app.HandleFunc("/", handleIndex).Methods("GET")
 	app.HandleFunc("/notify", handleNotify).Methods("POST")
 	app.HandleFunc("/setpassword", submit).Methods("POST")
 	app.HandleFunc("/password", passwordprompt).Methods("GET")
 
-	if err := http.ListenAndServe(addr, app); err != nil {
+	if _, ok := os.LookupEnv("AWS_LAMBDA_FUNCTION_NAME"); ok {
+		err = gateway.ListenAndServe("", app)
+	} else {
+		err = http.ListenAndServe(":"+os.Getenv("PORT"), app)
+	}
+	if err != nil {
 		log.WithError(err).Fatal("error listening")
 	}
 }
@@ -61,13 +72,14 @@ func submit(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, &http.Cookie{
 		Name:    "password",
 		Value:   password,
-		Expires: time.Now().Add(8760 * time.Hour), // Expire in a year?
+		Expires: time.Now().Add(8760 * time.Hour),
 	})
 
 	http.Redirect(w, r, "/", http.StatusFound)
 }
 
 func passwordprompt(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	views.ExecuteTemplate(w, "passwordprompt.tmpl", map[string]interface{}{})
 }
 
@@ -112,6 +124,7 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 	mac.Write([]byte(b64policy))
 	signature := base64.StdEncoding.EncodeToString(mac.Sum(nil))
 
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	views.ExecuteTemplate(w, "index.tmpl", map[string]interface{}{
 		"Stage":     os.Getenv("UP_STAGE"),
 		"UPLOAD_ID": os.Getenv("UPLOAD_ID"),
@@ -124,8 +137,6 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleNotify(w http.ResponseWriter, r *http.Request) {
-
-	// TODO Check my cookie?
 
 	var upload S3upload
 
@@ -145,18 +156,16 @@ func handleNotify(w http.ResponseWriter, r *http.Request) {
 	topic := os.Getenv("NOTIFY_TOPIC")
 	if topic == "" {
 		log.Warn("NOTIFY_TOPIC environment not setup")
-		http.Error(w, fmt.Sprintf("Please tell the Administrator that the notification topic is not setup"), http.StatusInternalServerError)
+		http.Error(w, "Please tell the Administrator that the notification topic is not setup", http.StatusInternalServerError)
 		return
 	}
 
-	cfg, err := external.LoadDefaultAWSConfig(external.WithSharedConfigProfile("mine"))
-	// cfg, err := external.LoadDefaultAWSConfig()
+	cfg, err := external.LoadDefaultAWSConfig()
 	if err != nil {
 		log.WithError(err).Fatal("setting up credentials")
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	cfg.Region = "ap-southeast-1"
 
 	uploadJSON, err := json.MarshalIndent(upload, "", "   ")
 	if err != nil {

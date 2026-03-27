@@ -1,2 +1,6 @@
 env
 gin-bin
+.aws-sam/
+bootstrap
+server
+functions/transcode/bin/

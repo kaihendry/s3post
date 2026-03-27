@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path"
@@ -24,6 +23,13 @@ import (
 )
 
 type convert func(src string, dst string) error
+
+type S3upload struct {
+	Key         string `json:"Key"`
+	URL         string `json:"URL"`
+	Bucket      string `json:"Bucket"`
+	ContentType string `json:"ContentType"`
+}
 
 var cfg aws.Config
 
@@ -68,7 +74,7 @@ func handler(ctx context.Context, evt events.SNSEvent) (string, error) {
 		log.Info("jpg file")
 		info, err = transcode(cjpegprocess, uploadObject, uploadObject)
 		if err != nil {
-			log.WithError(err).Error("failed to cjpeg jpg file")
+			log.WithError(err).Error("failed to jpegtran jpg file")
 			return "", err
 		}
 		processedURL = uploadObject.URL
@@ -84,6 +90,14 @@ func handler(ctx context.Context, evt events.SNSEvent) (string, error) {
 			return "", err
 		}
 		processedURL = mp4Object.URL
+	case ".webp":
+		log.Info("webp file")
+		info, err = transcode(cwebpprocess, uploadObject, uploadObject)
+		if err != nil {
+			log.WithError(err).Error("failed to cwebp webp file")
+			return "", err
+		}
+		processedURL = uploadObject.URL
 	default:
 		log.Warnf("unrecognized %s", mediatype)
 	}
@@ -94,7 +108,7 @@ func handler(ctx context.Context, evt events.SNSEvent) (string, error) {
 			TopicArn: aws.String(os.Getenv("TOPIC")),
 			Message:  aws.String(fmt.Sprintf("%s\n%s", processedURL, info)),
 		})
-		_, err := req.Send()
+		_, err := req.Send(context.Background())
 		if err != nil {
 			return "", err
 		}
@@ -103,7 +117,7 @@ func handler(ctx context.Context, evt events.SNSEvent) (string, error) {
 	return "", nil
 }
 
-func put(src string, dst s3post.S3upload) (err error) {
+func put(src string, dst S3upload) (err error) {
 	log.Infof("Putting %s on %v", src, dst)
 	svc := s3.New(cfg)
 
@@ -123,7 +137,7 @@ func put(src string, dst s3post.S3upload) (err error) {
 	}
 
 	req := svc.PutObjectRequest(putparams)
-	_, err = req.Send()
+	_, err = req.Send(context.Background())
 	if err != nil {
 		log.WithError(err).Fatal("failed to upload to s3")
 		return err
@@ -132,7 +146,7 @@ func put(src string, dst s3post.S3upload) (err error) {
 	return nil
 }
 
-func get(src s3post.S3upload, dst string) (err error) {
+func get(src S3upload, dst string) (err error) {
 
 	svc := s3.New(cfg)
 
@@ -142,7 +156,7 @@ func get(src s3post.S3upload, dst string) (err error) {
 	}
 
 	req := svc.GetObjectRequest(input)
-	res, err := req.Send()
+	res, err := req.Send(context.Background())
 	if err != nil {
 		log.WithError(err).Fatal("failed to get file")
 		return err
@@ -160,10 +174,10 @@ func get(src s3post.S3upload, dst string) (err error) {
 	return err
 }
 
-func transcode(fn convert, srcObject s3post.S3upload, dstObject s3post.S3upload) (info string, err error) {
+func transcode(fn convert, srcObject S3upload, dstObject S3upload) (info string, err error) {
 
 	// foo to get tempfile ending in foo$
-	srctmpfile, err := ioutil.TempFile("", "*"+filepath.Ext(srcObject.Key))
+	srctmpfile, err := os.CreateTemp("", "*"+filepath.Ext(srcObject.Key))
 	if err != nil {
 		log.WithError(err).Fatal("failed to create temp input file")
 		return "", err
@@ -178,7 +192,7 @@ func transcode(fn convert, srcObject s3post.S3upload, dstObject s3post.S3upload)
 		return "", err
 	}
 
-	tmpfile, err := ioutil.TempFile("", "*"+filepath.Ext(dstObject.Key))
+	tmpfile, err := os.CreateTemp("", "*"+filepath.Ext(dstObject.Key))
 	if err != nil {
 		log.WithError(err).Error("failed to create temp output file")
 		return "", err
@@ -204,8 +218,17 @@ func transcode(fn convert, srcObject s3post.S3upload, dstObject s3post.S3upload)
 
 }
 
+// lookPath finds a binary by checking ./name first (for Lambda bundled binaries),
+// then falling back to PATH.
+func lookPath(name string) (string, error) {
+	if p, err := exec.LookPath("./" + name); err == nil {
+		return p, nil
+	}
+	return exec.LookPath(name)
+}
+
 func ffmpegprocess(src string, dst string) (err error) {
-	path, err := exec.LookPath("./ffmpeg")
+	path, err := lookPath("ffmpeg")
 	if err != nil {
 		log.WithError(err).Error("no ffmpeg binary found")
 		return err
@@ -241,7 +264,7 @@ func ffmpegprocess(src string, dst string) (err error) {
 
 func pngquantprocess(src string, dst string) (err error) {
 	var out []byte
-	path, err := exec.LookPath("./pngquant")
+	path, err := lookPath("pngquant")
 	if err != nil {
 		log.WithError(err).Error("no pngquant binary found")
 		return err
@@ -256,14 +279,33 @@ func pngquantprocess(src string, dst string) (err error) {
 
 func cjpegprocess(src string, dst string) (err error) {
 	var out []byte
-	path, err := exec.LookPath("./cjpeg-static")
+	p, err := lookPath("jpegtran")
 	if err != nil {
-		log.WithError(err).Error("no cjpeg-static binary found")
+		log.WithError(err).Error("no jpegtran binary found")
 		return err
 	}
-	out, err = exec.Command(path, "-quality", "80", "-outfile", dst, src).CombinedOutput()
+	cmd := exec.Command(p, "-optimize", "-outfile", dst, src)
+	// Bundle libjpeg.so.62 alongside the binary; point the linker to its directory.
+	absP, _ := filepath.Abs(p)
+	cmd.Env = append(os.Environ(), "LD_LIBRARY_PATH="+filepath.Dir(absP))
+	out, err = cmd.CombinedOutput()
 	if err != nil {
-		log.WithError(err).Errorf("cjpeg-static failed: %s", out)
+		log.WithError(err).Errorf("jpegtran failed: %s", out)
+		return err
+	}
+	return err
+}
+
+func cwebpprocess(src string, dst string) (err error) {
+	var out []byte
+	path, err := lookPath("cwebp")
+	if err != nil {
+		log.WithError(err).Error("no cwebp binary found")
+		return err
+	}
+	out, err = exec.Command(path, "-q", "80", src, "-o", dst).CombinedOutput()
+	if err != nil {
+		log.WithError(err).Errorf("cwebp failed: %s", out)
 		return err
 	}
 	return err
