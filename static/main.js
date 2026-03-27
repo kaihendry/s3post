@@ -1,76 +1,49 @@
-document.addEventListener('DOMContentLoaded', function (event) {
-  var uploadFile = document.getElementById('uploadFile')
-
-  uploadFile.addEventListener('change', enableUpload, false)
-  function enableUpload () {
+document.addEventListener('DOMContentLoaded', function () {
+  const uploadFile = document.getElementById('uploadFile')
+  uploadFile.addEventListener('change', () => {
     document.getElementById('uploadButton').disabled = false
-  }
-
+  })
   window.addEventListener('paste', e => {
     uploadFile.files = e.clipboardData.files
   })
 })
 
-function fileSelected (form) {
+function fileSelected(form) {
   form.uploadButton.disabled = true
-  const BUCKET = document.getElementById('BUCKET').innerHTML
-  const UPLOAD_ID = document.getElementById('UPLOAD_ID').innerHTML
-  const REGION = document.getElementById('REGION').innerHTML
-  const Policy = document.getElementById('Policy').innerHTML
-  const Signature = document.getElementById('Signature').innerHTML
-
   const f = document.getElementById('uploadFile')
   const file = f.files[0]
-  let key
+  if (!file) return false
 
-  if (file) {
-    const ymd = new Date().toISOString().slice(0, 10)
-    key = ymd + '/' + file.name
+  const ymd = new Date().toISOString().slice(0, 10)
+  const filename = document.getElementById('filename').value
+  const ext = file.name.split('.').pop()
+  const key = filename ? `${ymd}/${filename}.${ext}` : `${ymd}/${file.name}`
 
-    // filename can be overidden by the form input
-    const filename = document.getElementById('filename').value
-    if (filename) {
-      key = ymd + '/' + filename + '.' + file.name.split('.').pop()
-    }
-
-    var fileSize = 0
-    if (file.size > 1024 * 1024) fileSize = (Math.round(file.size * 100 / (1024 * 1024)) / 100).toString() + 'MB'; else fileSize = (Math.round(file.size * 100 / 1024) / 100).toString() + 'KB'
-  }
-
-  const fd = new window.FormData()
-
-  fd.append('AWSAccessKeyId', UPLOAD_ID)
-  fd.append('policy', window.btoa(Policy))
-  fd.append('signature', Signature)
-
-  fd.append('key', key)
-  fd.append('acl', 'public-read')
-  fd.append('Content-Type', file.type)
-  fd.append('file', f.files[0])
-
-  // Fetch doesn't support progress events yet
-  // TODO: How to prevent browser from breaking upload whilst still in progress!
-
-  window.fetch(`https://s3-${REGION}.amazonaws.com/${BUCKET}`, { method: 'POST', body: fd }).then(function (res) {
-    if (res.ok) {
-      document.getElementById('fileName').innerHTML = `<a href="//${BUCKET}/${key}">Name: ${key}</a>`
-      document.getElementById('fileSize').innerHTML = `Size: ${fileSize}`
-      document.getElementById('fileType').innerHTML = `Type: ${file.type}`
-
-      // Notify NOTIFY_TOPIC via SNS of a successful upload
-      window.fetch('/notify', { method: 'POST',
-        body: JSON.stringify({URL: `https://${BUCKET}/${key}`, Bucket: BUCKET, Key: key, ContentType: file.type})
-      }).then(function (res) {
-        if (res.ok) {
-          console.log(res)
-        } else {
-          console.error(res)
-        }
+  fetch(`/presign?key=${encodeURIComponent(key)}`)
+    .then(r => {
+      if (!r.ok) throw new Error('presign failed: ' + r.status)
+      return r.json()
+    })
+    .then(({ url }) => fetch(url, {
+      method: 'PUT',
+      body: file,
+      headers: { 'Content-Type': file.type || 'application/octet-stream' },
+    }))
+    .then(res => {
+      if (!res.ok) throw new Error('upload failed: ' + res.status)
+      const publicURL = `https://${document.querySelector('code').textContent}/${key}`
+      document.getElementById('result').innerHTML =
+        `Uploaded: <a href="//${document.querySelector('code').textContent}/${key}">${key}</a>`
+      return fetch('/notify', {
+        method: 'POST',
+        body: JSON.stringify({ URL: publicURL, Bucket: document.querySelector('code').textContent, Key: key, ContentType: file.type }),
       })
-    } else {
-      console.error(res)
-    }
-  })
+    })
+    .then(res => { if (!res.ok) console.error('notify failed', res) })
+    .catch(err => {
+      document.getElementById('result').innerHTML = `Error: ${err.message}`
+      form.uploadButton.disabled = false
+    })
 
   return false
 }

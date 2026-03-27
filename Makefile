@@ -14,8 +14,6 @@ deploy:
 			DomainName=$(DOMAINNAME) \
 			ACMCertificateArn=$(ACMCERTIFICATEARN) \
 			Password=$(PASSWORD) \
-			UploadId=$(UPLOAD_ID) \
-			UploadSecret=$(UPLOAD_SECRET) \
 		--no-confirm-changeset --no-fail-on-empty-changeset \
 		--capabilities CAPABILITY_IAM
 	@echo "CNAME: $$(AWS_PROFILE=$(AWS_PROFILE) aws cloudformation describe-stacks --stack-name $(STACK) --region $(AWS_DEFAULT_REGION) --query 'Stacks[0].Outputs[?OutputKey==`CNAME`].OutputValue' --output text)"

@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Upload to AWS S3 {{ .Stage }}</title>
+<title>Upload to S3</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <meta name="robots" content="noindex">
 <link rel="stylesheet" href="https://newcss.net/lite.css">
@@ -9,34 +9,19 @@
 </head>
 <body>
 
-<div id="fileName"></div>
-<div id="fileSize"></div>
-<div id="fileType"></div>
-<div id="progressNumber"></div>
+<div id="result"></div>
 
 <form class=inputs onsubmit="return fileSelected(this);">
-
 <label>
 <strong>Optional:</strong> Upload file name
 <input type=text pattern="([0-9]|[A-Z]|[a-z]|[!\-_.*'\(\)])+" id=filename autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
 </label>
 <label>Upload file <input id="uploadFile" type=file required></label>
-<input id="uploadButton" name="uploadButton" type=submit value="Upload">
+<input id="uploadButton" name="uploadButton" type=submit value="Upload" disabled>
 <input type="reset">
 </form>
 
-<dl>
-	<dt>BUCKET</dt>
-	<dd id="BUCKET">{{ .BUCKET  }}</dd>
-	<dt>UPLOAD_ID</dt>
-	<dd id="UPLOAD_ID">{{ .UPLOAD_ID  }}</dd>
-	<dt>REGION</dt>
-	<dd id="REGION">{{ .REGION  }}</dd>
-	<dt>Policy</dt>
-	<dd><pre id="Policy">{{ .Policy  }}</pre></dd>
-	<dt>Signature</dt>
-	<dd><pre id="Signature">{{ .Signature  }}</pre></dd>
-</dl>
+<p>Bucket: <code>{{ .BUCKET }}</code></p>
 
 </body>
 </html>

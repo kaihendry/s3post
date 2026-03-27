@@ -1,4 +1,5 @@
 env
+s3post
 gin-bin
 .aws-sam/
 bootstrap

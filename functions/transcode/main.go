@@ -15,11 +15,11 @@ import (
 	"github.com/apex/log"
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/aws/external"
+	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/sns"
 	humanize "github.com/dustin/go-humanize"
-	"github.com/kaihendry/aws-lambda-go/events"
+	"github.com/aws/aws-lambda-go/events"
 )
 
 type convert func(src string, dst string) error
@@ -31,10 +31,7 @@ type S3upload struct {
 	ContentType string `json:"ContentType"`
 }
 
-var cfg aws.Config
-
 func main() {
-	cfg, _ = external.LoadDefaultAWSConfig(external.WithSharedConfigProfile("mine"))
 	lambda.Start(handler)
 }
 
@@ -103,12 +100,14 @@ func handler(ctx context.Context, evt events.SNSEvent) (string, error) {
 	}
 
 	if processedURL != "" {
-		client := sns.New(cfg)
-		req := client.PublishRequest(&sns.PublishInput{
+		cfg, err := config.LoadDefaultConfig(ctx)
+		if err != nil {
+			return "", err
+		}
+		_, err = sns.NewFromConfig(cfg).Publish(ctx, &sns.PublishInput{
 			TopicArn: aws.String(os.Getenv("TOPIC")),
 			Message:  aws.String(fmt.Sprintf("%s\n%s", processedURL, info)),
 		})
-		_, err := req.Send(context.Background())
 		if err != nil {
 			return "", err
 		}
@@ -119,7 +118,6 @@ func handler(ctx context.Context, evt events.SNSEvent) (string, error) {
 
 func put(src string, dst S3upload) (err error) {
 	log.Infof("Putting %s on %v", src, dst)
-	svc := s3.New(cfg)
 
 	f, err := os.Open(src)
 	if err != nil {
@@ -128,49 +126,44 @@ func put(src string, dst S3upload) (err error) {
 	}
 	defer f.Close()
 
-	putparams := &s3.PutObjectInput{
-		Bucket:      aws.String(dst.Bucket),
-		Body:        aws.ReadSeekCloser(f),
-		Key:         aws.String(dst.Key),
-		ACL:         s3.ObjectCannedACLPublicRead,
-		ContentType: aws.String(fmt.Sprintf("%s; charset=UTF-8", dst.ContentType)),
-	}
-
-	req := svc.PutObjectRequest(putparams)
-	_, err = req.Send(context.Background())
+	cfg, err := config.LoadDefaultConfig(context.Background())
 	if err != nil {
-		log.WithError(err).Fatal("failed to upload to s3")
 		return err
 	}
-
-	return nil
+	_, err = s3.NewFromConfig(cfg).PutObject(context.Background(), &s3.PutObjectInput{
+		Bucket:      aws.String(dst.Bucket),
+		Body:        f,
+		Key:         aws.String(dst.Key),
+		ContentType: aws.String(dst.ContentType),
+	})
+	if err != nil {
+		log.WithError(err).Fatal("failed to upload to s3")
+	}
+	return err
 }
 
 func get(src S3upload, dst string) (err error) {
-
-	svc := s3.New(cfg)
-
-	input := &s3.GetObjectInput{
+	cfg, err := config.LoadDefaultConfig(context.Background())
+	if err != nil {
+		return err
+	}
+	res, err := s3.NewFromConfig(cfg).GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket: aws.String(src.Bucket),
 		Key:    aws.String(src.Key),
-	}
-
-	req := svc.GetObjectRequest(input)
-	res, err := req.Send(context.Background())
+	})
 	if err != nil {
 		log.WithError(err).Fatal("failed to get file")
 		return err
 	}
+	defer res.Body.Close()
 
 	outFile, err := os.Create(dst)
 	if err != nil {
 		log.WithError(err).Fatal("failed to create output file")
 		return err
 	}
-
 	defer outFile.Close()
 	_, err = io.Copy(outFile, res.Body)
-
 	return err
 }
 

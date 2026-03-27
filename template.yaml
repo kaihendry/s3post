@@ -1,0 +1,102 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+
+Parameters:
+  DomainName:
+    Type: String
+    Default: up.dabase.com
+  ACMCertificateArn:
+    Type: String
+  Password:
+    Type: String
+    NoEcho: true
+  Bucket:
+    Type: String
+    Default: s.natalian.org
+
+Globals:
+  Function:
+    LoggingConfig:
+      LogFormat: JSON
+
+Resources:
+  AccessLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      RetentionInDays: 30
+      LogGroupName: !Ref DomainName
+
+  Gateway:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      Domain:
+        DomainName: !Ref DomainName
+        CertificateArn: !Ref ACMCertificateArn
+
+  NotifyTopic:
+    Type: AWS::SNS::Topic
+
+  MainFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Architectures:
+        - arm64
+      CodeUri: .
+      Handler: bootstrap
+      Runtime: provided.al2023
+      Environment:
+        Variables:
+          PASSWORD: !Ref Password
+          BUCKET: !Ref Bucket
+          NOTIFY_TOPIC: !Ref NotifyTopic
+      Policies:
+        - SNSPublishMessagePolicy:
+            TopicName: !GetAtt NotifyTopic.TopicName
+        - S3WritePolicy:
+            BucketName: !Ref Bucket
+      Events:
+        Root:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref Gateway
+            Path: /
+            Method: GET
+        CatchAll:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref Gateway
+            Path: /{proxy+}
+            Method: ANY
+    Metadata:
+      BuildMethod: makefile
+
+  TranscodeFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Architectures:
+        - arm64
+      CodeUri: .
+      Handler: bootstrap
+      Runtime: provided.al2023
+      Timeout: 300
+      MemorySize: 3000
+      Environment:
+        Variables:
+          TOPIC: !Ref NotifyTopic
+      Policies:
+        - S3CrudPolicy:
+            BucketName: !Ref Bucket
+        - SNSPublishMessagePolicy:
+            TopicName: !GetAtt NotifyTopic.TopicName
+      Events:
+        SNSEvent:
+          Type: SNS
+          Properties:
+            Topic: !Ref NotifyTopic
+    Metadata:
+      BuildMethod: makefile
+
+Outputs:
+  CNAME:
+    Description: CNAME value for DNS — point up.dabase.com here
+    Value: !GetAtt [Gateway.DomainName, RegionalDomainName]
