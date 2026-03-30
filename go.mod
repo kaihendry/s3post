@@ -5,13 +5,13 @@ go 1.25
 require (
 	github.com/apex/gateway/v2 v2.0.0
 	github.com/apex/log v1.9.0
-	github.com/aws/aws-lambda-go v1.19.1
+	github.com/aws/aws-lambda-go v1.54.0
 	github.com/aws/aws-sdk-go-v2 v1.41.5
 	github.com/aws/aws-sdk-go-v2/config v1.32.13
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.97.3
 	github.com/aws/aws-sdk-go-v2/service/sns v1.39.15
 	github.com/dustin/go-humanize v1.0.0
-	github.com/gorilla/mux v1.8.0
+	github.com/gorilla/mux v1.8.1
 )
 
 require (

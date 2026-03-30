@@ -39,7 +39,7 @@ download-bins:
 	# ffmpeg (arm64, static) from johnvansickle.com
 	curl -Lo /tmp/ffmpeg.tar.xz https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-arm64-static.tar.xz
 	tar xf /tmp/ffmpeg.tar.xz -C /tmp/
-	cp /tmp/ffmpeg-*-arm64-static/ffmpeg functions/transcode/bin/
+	cp /tmp/ffmpeg-*-arm64-static/ffmpeg /tmp/ffmpeg-*-arm64-static/ffprobe functions/transcode/bin/
 	chmod +x functions/transcode/bin/*
 
 validate:

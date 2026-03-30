@@ -18,7 +18,7 @@ func TestPasswordPrompt(t *testing.T) {
 }
 
 func TestSubmit(t *testing.T) {
-	req := httptest.NewRequest("POST", "/setpassword", strings.NewReader("password=kensentme"))
+	req := httptest.NewRequest("POST", "/setpassword", strings.NewReader("password=testpw"))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	w := httptest.NewRecorder()
 	submit(w, req)
@@ -26,13 +26,13 @@ func TestSubmit(t *testing.T) {
 		t.Errorf("expected 302, got %d", w.Code)
 	}
 	cookies := w.Result().Cookies()
-	if len(cookies) == 0 || cookies[0].Name != "password" || cookies[0].Value != "kensentme" {
+	if len(cookies) == 0 || cookies[0].Name != "password" || cookies[0].Value != "testpw" {
 		t.Error("password cookie not set correctly")
 	}
 }
 
 func TestHandleIndex_NoCookie(t *testing.T) {
-	os.Setenv("PASSWORD", "kensentme")
+	os.Setenv("PASSWORD", "testpw")
 	req := httptest.NewRequest("GET", "/", nil)
 	w := httptest.NewRecorder()
 	handleIndex(w, req)
@@ -45,7 +45,7 @@ func TestHandleIndex_NoCookie(t *testing.T) {
 }
 
 func TestHandleIndex_WrongPassword(t *testing.T) {
-	os.Setenv("PASSWORD", "kensentme")
+	os.Setenv("PASSWORD", "testpw")
 	req := httptest.NewRequest("GET", "/", nil)
 	req.AddCookie(&http.Cookie{Name: "password", Value: "wrongpassword"})
 	w := httptest.NewRecorder()
@@ -56,10 +56,10 @@ func TestHandleIndex_WrongPassword(t *testing.T) {
 }
 
 func TestHandleIndex_CorrectPassword(t *testing.T) {
-	os.Setenv("PASSWORD", "kensentme")
+	os.Setenv("PASSWORD", "testpw")
 	os.Setenv("BUCKET", "s.natalian.org")
 	req := httptest.NewRequest("GET", "/", nil)
-	req.AddCookie(&http.Cookie{Name: "password", Value: "kensentme"})
+	req.AddCookie(&http.Cookie{Name: "password", Value: "testpw"})
 	w := httptest.NewRecorder()
 	handleIndex(w, req)
 	if w.Code != http.StatusOK {

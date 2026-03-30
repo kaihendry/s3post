@@ -87,6 +87,18 @@ func handler(ctx context.Context, evt events.SNSEvent) (string, error) {
 			return "", err
 		}
 		processedURL = mp4Object.URL
+		cfg, err := config.LoadDefaultConfig(ctx)
+		if err != nil {
+			return "", err
+		}
+		_, err = s3.NewFromConfig(cfg).DeleteObject(ctx, &s3.DeleteObjectInput{
+			Bucket: aws.String(uploadObject.Bucket),
+			Key:    aws.String(uploadObject.Key),
+		})
+		if err != nil {
+			log.WithError(err).Error("failed to delete source mov")
+			return "", err
+		}
 	case ".webp":
 		log.Info("webp file")
 		info, err = transcode(cwebpprocess, uploadObject, uploadObject)
@@ -207,7 +219,13 @@ func transcode(fn convert, srcObject S3upload, dstObject S3upload) (info string,
 		return "", err
 	}
 
-	return fmt.Sprintf("Transcode size: %s → %s", size(src), size(dst)), err
+	info = fmt.Sprintf("Transcode size: %s → %s", size(src), size(dst))
+	if strings.ToLower(filepath.Ext(dstObject.Key)) == ".mp4" {
+		if res, rerr := resolution(dst); rerr == nil {
+			info = fmt.Sprintf("%s (%s)", info, res)
+		}
+	}
+	return info, err
 
 }
 
@@ -307,4 +325,22 @@ func cwebpprocess(src string, dst string) (err error) {
 func size(file string) string {
 	stats, _ := os.Stat(file)
 	return humanize.Bytes(uint64(stats.Size()))
+}
+
+func resolution(file string) (string, error) {
+	path, err := lookPath("ffprobe")
+	if err != nil {
+		return "", err
+	}
+	out, err := exec.Command(path,
+		"-v", "error",
+		"-select_streams", "v:0",
+		"-show_entries", "stream=width,height",
+		"-of", "csv=s=x:p=0",
+		file,
+	).Output()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(out)), nil
 }

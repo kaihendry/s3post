@@ -36,6 +36,13 @@ Resources:
   NotifyTopic:
     Type: AWS::SNS::Topic
 
+  NotifyTopicEmailSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Protocol: email
+      Endpoint: hendry+s3postprocessed@iki.fi
+      TopicArn: !Ref NotifyTopic
+
   MainFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -79,7 +86,7 @@ Resources:
       Handler: bootstrap
       Runtime: provided.al2023
       Timeout: 300
-      MemorySize: 3000
+      MemorySize: 10240
       Environment:
         Variables:
           TOPIC: !Ref NotifyTopic

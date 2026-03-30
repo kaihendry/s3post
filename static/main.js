@@ -24,16 +24,19 @@ function fileSelected(form) {
       if (!r.ok) throw new Error('presign failed: ' + r.status)
       return r.json()
     })
-    .then(({ url }) => fetch(url, {
-      method: 'PUT',
-      body: file,
-      headers: { 'Content-Type': file.type || 'application/octet-stream' },
-    }))
+    .then(({ url }) => {
+      document.getElementById('result').textContent = 'Uploading...'
+      return fetch(url, {
+        method: 'PUT',
+        body: file,
+        headers: { 'Content-Type': file.type || 'application/octet-stream' },
+      })
+    })
     .then(res => {
       if (!res.ok) throw new Error('upload failed: ' + res.status)
       const publicURL = `https://${document.querySelector('code').textContent}/${key}`
       document.getElementById('result').innerHTML =
-        `Uploaded: <a href="//${document.querySelector('code').textContent}/${key}">${key}</a>`
+        `Uploaded: <a href="//${document.querySelector('code').textContent}/${key}">${key}</a> — processing in background, you will be emailed when done`
       return fetch('/notify', {
         method: 'POST',
         body: JSON.stringify({ URL: publicURL, Bucket: document.querySelector('code').textContent, Key: key, ContentType: file.type }),
