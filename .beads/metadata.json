@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "server",
+  "dolt_database": "s3post",
+  "project_id": "3d5046cb-1cb9-4e6d-a859-f4e8d6a1984f"
+}
