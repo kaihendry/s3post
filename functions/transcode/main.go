@@ -99,6 +99,30 @@ func handler(ctx context.Context, evt events.SNSEvent) (string, error) {
 			log.WithError(err).Error("failed to delete source mov")
 			return "", err
 		}
+	case ".heic":
+		log.Info("heic file")
+		jpegObject := uploadObject
+		jpegObject.Key = jpegObject.Key[0:len(jpegObject.Key)-len(mediatype)] + ".jpg"
+		jpegObject.URL = jpegObject.URL[0:len(jpegObject.URL)-len(mediatype)] + ".jpg"
+		jpegObject.ContentType = "image/jpeg"
+		info, err = transcode(heicprocess, uploadObject, jpegObject)
+		if err != nil {
+			log.WithError(err).Error("failed to convert heic to jpeg")
+			return "", err
+		}
+		processedURL = jpegObject.URL
+		cfg, err := config.LoadDefaultConfig(ctx)
+		if err != nil {
+			return "", err
+		}
+		_, err = s3.NewFromConfig(cfg).DeleteObject(ctx, &s3.DeleteObjectInput{
+			Bucket: aws.String(uploadObject.Bucket),
+			Key:    aws.String(uploadObject.Key),
+		})
+		if err != nil {
+			log.WithError(err).Error("failed to delete source heic")
+			return "", err
+		}
 	case ".webp":
 		log.Info("webp file")
 		info, err = transcode(cwebpprocess, uploadObject, uploadObject)
@@ -270,6 +294,23 @@ func ffmpegprocess(src string, dst string) (err error) {
 		return err
 	}
 
+	return err
+}
+
+func heicprocess(src string, dst string) (err error) {
+	p, err := lookPath("heif-convert")
+	if err != nil {
+		log.WithError(err).Error("no heif-convert binary found")
+		return err
+	}
+	log.Infof("Converting HEIC to JPEG: %s -> %s", src, dst)
+	absP, _ := filepath.Abs(p)
+	cmd := exec.Command(p, src, dst)
+	cmd.Env = append(os.Environ(), "LD_LIBRARY_PATH="+filepath.Dir(absP))
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		log.WithError(err).Errorf("heif-convert failed: %s", out)
+	}
 	return err
 }
 

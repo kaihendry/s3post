@@ -40,6 +40,13 @@ download-bins:
 	curl -Lo /tmp/ffmpeg.tar.xz https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-arm64-static.tar.xz
 	tar xf /tmp/ffmpeg.tar.xz -C /tmp/
 	cp /tmp/ffmpeg-*-arm64-static/ffmpeg /tmp/ffmpeg-*-arm64-static/ffprobe functions/transcode/bin/
+	# heif-convert (arm64) + shared libs from Amazon Linux 2023 for HEIC->JPEG conversion
+	docker run --rm --platform linux/arm64 \
+		-v $(PWD)/functions/transcode/bin:/out \
+		amazonlinux:2023 bash -c \
+		"dnf install -y libheif-tools findutils 2>/dev/null >/dev/null && \
+		 cp /usr/bin/heif-convert /out/ && \
+		 ldd /usr/bin/heif-convert | awk '\$$2==\"=>\" && \$$3~/^\// {print \$$3}' | xargs -I{} cp -n {} /out/"
 	chmod +x functions/transcode/bin/*
 
 validate:

@@ -107,6 +107,37 @@ func TestCwebpprocess(t *testing.T) {
 	}
 }
 
+func TestHeicprocess(t *testing.T) {
+	if _, err := lookPath("heif-convert"); err != nil {
+		t.Skip("heif-convert not found in PATH")
+	}
+	src := "/Users/hendry/Downloads/IMG_2618.HEIC"
+	if _, err := os.Stat(src); err != nil {
+		t.Skipf("test fixture not found: %s", src)
+	}
+
+	dst := filepath.Join(t.TempDir(), "out.jpg")
+	if err := heicprocess(src, dst); err != nil {
+		t.Fatalf("heicprocess failed: %v", err)
+	}
+	info, err := os.Stat(dst)
+	if err != nil {
+		t.Fatalf("output file missing: %v", err)
+	}
+	if info.Size() == 0 {
+		t.Fatal("output file is empty")
+	}
+	// Verify it's a valid JPEG by checking magic bytes
+	f, _ := os.Open(dst)
+	defer f.Close()
+	magic := make([]byte, 3)
+	f.Read(magic)
+	if magic[0] != 0xFF || magic[1] != 0xD8 {
+		t.Fatalf("output is not a valid JPEG (magic: %x)", magic)
+	}
+	t.Logf("HEIC->JPEG: %d bytes", info.Size())
+}
+
 func TestFfmpegprocess(t *testing.T) {
 	p, err := lookPath("ffmpeg")
 	if err != nil {
