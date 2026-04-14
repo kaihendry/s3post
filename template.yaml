@@ -33,6 +33,9 @@ Resources:
         DomainName: !Ref DomainName
         CertificateArn: !Ref ACMCertificateArn
 
+  UploadTopic:
+    Type: AWS::SNS::Topic
+
   NotifyTopic:
     Type: AWS::SNS::Topic
 
@@ -55,10 +58,10 @@ Resources:
         Variables:
           PASSWORD: !Ref Password
           BUCKET: !Ref Bucket
-          NOTIFY_TOPIC: !Ref NotifyTopic
+          NOTIFY_TOPIC: !Ref UploadTopic
       Policies:
         - SNSPublishMessagePolicy:
-            TopicName: !GetAtt NotifyTopic.TopicName
+            TopicName: !GetAtt UploadTopic.TopicName
         - S3WritePolicy:
             BucketName: !Ref Bucket
       Events:
@@ -99,7 +102,7 @@ Resources:
         SNSEvent:
           Type: SNS
           Properties:
-            Topic: !Ref NotifyTopic
+            Topic: !Ref UploadTopic
     Metadata:
       BuildMethod: makefile
 
