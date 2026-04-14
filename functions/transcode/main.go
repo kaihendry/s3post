@@ -5,8 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"image"
-	_ "image/jpeg"
 	"io"
 	"os"
 	"os/exec"
@@ -15,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/apex/log"
+	"github.com/disintegration/imaging"
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -374,7 +373,8 @@ func avifprocess(src string, dst string) error {
 	}
 	defer f.Close()
 
-	img, _, err := image.Decode(f)
+	// AutoOrientation applies the EXIF Orientation tag so rotation is correct
+	img, err := imaging.Decode(f, imaging.AutoOrientation(true))
 	if err != nil {
 		return fmt.Errorf("decode image: %w", err)
 	}

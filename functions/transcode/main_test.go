@@ -216,3 +216,42 @@ func TestAvifprocess(t *testing.T) {
 	}
 	t.Logf("JPEG->AVIF: %d bytes", info.Size())
 }
+
+func TestAvifprocessAutoRotation(t *testing.T) {
+	if _, err := exec.LookPath("exiftool"); err != nil {
+		t.Skip("exiftool not found in PATH")
+	}
+
+	// Create a 100x50 landscape JPEG (wider than tall)
+	f, err := os.CreateTemp("", "*.jpg")
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.Close()
+	defer os.Remove(f.Name())
+
+	img := image.NewRGBA(image.Rect(0, 0, 100, 50))
+	out, _ := os.Create(f.Name())
+	jpeg.Encode(out, img, nil)
+	out.Close()
+
+	// Orientation=6 means 90° CW rotation: output should be 50 wide × 100 tall
+	if o, err := exec.Command("exiftool", "-overwrite_original", "-Orientation=6", "-n", f.Name()).CombinedOutput(); err != nil {
+		t.Fatalf("exiftool failed: %v: %s", err, o)
+	}
+
+	dst := filepath.Join(t.TempDir(), "out.avif")
+	if err := avifprocess(f.Name(), dst); err != nil {
+		t.Fatalf("avifprocess failed: %v", err)
+	}
+
+	avifF, _ := os.Open(dst)
+	defer avifF.Close()
+	cfg, _, err := image.DecodeConfig(avifF)
+	if err != nil {
+		t.Fatalf("DecodeConfig failed: %v", err)
+	}
+	if cfg.Width != 50 || cfg.Height != 100 {
+		t.Fatalf("expected 50×100 after auto-rotation, got %d×%d", cfg.Width, cfg.Height)
+	}
+}
