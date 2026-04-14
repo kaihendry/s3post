@@ -149,6 +149,9 @@ func handler(ctx context.Context, evt events.SNSEvent) (string, error) {
 			return "", err
 		}
 		processedURL = uploadObject.URL
+	case ".mp4":
+		log.Info("mp4 file - already processed, notifying")
+		processedURL = uploadObject.URL
 	default:
 		log.Warnf("unrecognized %s", mediatype)
 	}
