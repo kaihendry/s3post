@@ -31,5 +31,8 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.35.18 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.41.10 // indirect
 	github.com/aws/smithy-go v1.24.2 // indirect
+	github.com/ebitengine/purego v0.8.3 // indirect
+	github.com/gen2brain/avif v0.4.4 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
+	github.com/tetratelabs/wazero v1.9.0 // indirect
 )

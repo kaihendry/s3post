@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"image"
+	_ "image/jpeg"
 	"io"
 	"os"
 	"os/exec"
@@ -13,13 +15,14 @@ import (
 	"strings"
 
 	"github.com/apex/log"
+	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/sns"
 	humanize "github.com/dustin/go-humanize"
-	"github.com/aws/aws-lambda-go/events"
+	"github.com/gen2brain/avif"
 )
 
 type convert func(src string, dst string) error
@@ -68,13 +71,29 @@ func handler(ctx context.Context, evt events.SNSEvent) (string, error) {
 		}
 		processedURL = uploadObject.URL
 	case ".jpg", ".jpeg":
-		log.Info("jpg file")
-		info, err = transcode(cjpegprocess, uploadObject, uploadObject)
+		log.Info("jpg file - converting to avif")
+		avifObject := uploadObject
+		avifObject.Key = avifObject.Key[0:len(avifObject.Key)-len(mediatype)] + ".avif"
+		avifObject.URL = avifObject.URL[0:len(avifObject.URL)-len(mediatype)] + ".avif"
+		avifObject.ContentType = "image/avif"
+		info, err = transcode(avifprocess, uploadObject, avifObject)
 		if err != nil {
-			log.WithError(err).Error("failed to jpegtran jpg file")
+			log.WithError(err).Error("failed to convert jpg to avif")
 			return "", err
 		}
-		processedURL = uploadObject.URL
+		processedURL = avifObject.URL
+		cfg, err := config.LoadDefaultConfig(ctx)
+		if err != nil {
+			return "", err
+		}
+		_, err = s3.NewFromConfig(cfg).DeleteObject(ctx, &s3.DeleteObjectInput{
+			Bucket: aws.String(uploadObject.Bucket),
+			Key:    aws.String(uploadObject.Key),
+		})
+		if err != nil {
+			log.WithError(err).Error("failed to delete source jpg")
+			return "", err
+		}
 	case ".mov":
 		log.Info("mov file")
 		mp4Object := uploadObject
@@ -336,8 +355,8 @@ func cjpegprocess(src string, dst string) (err error) {
 		log.WithError(err).Error("no jpegtran binary found")
 		return err
 	}
-	cmd := exec.Command(p, "-optimize", "-outfile", dst, src)
-	// Bundle libjpeg.so.62 alongside the binary; point the linker to its directory.
+	// -copy all preserves EXIF (including Orientation) so rotation is not lost
+	cmd := exec.Command(p, "-copy", "all", "-optimize", "-outfile", dst, src)
 	absP, _ := filepath.Abs(p)
 	cmd.Env = append(os.Environ(), "LD_LIBRARY_PATH="+filepath.Dir(absP))
 	out, err = cmd.CombinedOutput()
@@ -346,6 +365,27 @@ func cjpegprocess(src string, dst string) (err error) {
 		return err
 	}
 	return err
+}
+
+func avifprocess(src string, dst string) error {
+	f, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	img, _, err := image.Decode(f)
+	if err != nil {
+		return fmt.Errorf("decode image: %w", err)
+	}
+
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	return avif.Encode(out, img)
 }
 
 func cwebpprocess(src string, dst string) (err error) {

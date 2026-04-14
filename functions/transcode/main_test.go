@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -157,4 +158,61 @@ func TestFfmpegprocess(t *testing.T) {
 	if _, err := os.Stat(dst); err != nil {
 		t.Fatalf("output file missing: %v", err)
 	}
+}
+
+func TestCjpegprocessPreservesOrientation(t *testing.T) {
+	if _, err := lookPath("jpegtran"); err != nil {
+		t.Skip("jpegtran not found in PATH")
+	}
+	if _, err := exec.LookPath("exiftool"); err != nil {
+		t.Skip("exiftool not found in PATH")
+	}
+
+	src := writeJPEG(t)
+	defer os.Remove(src)
+
+	// Embed Orientation=6 (90° CW rotation) into the JPEG
+	out, err := exec.Command("exiftool", "-overwrite_original", "-Orientation=6", "-n", src).CombinedOutput()
+	if err != nil {
+		t.Fatalf("exiftool set orientation failed: %v: %s", err, out)
+	}
+
+	dst := filepath.Join(t.TempDir(), "out.jpg")
+	if err := cjpegprocess(src, dst); err != nil {
+		t.Fatalf("cjpegprocess failed: %v", err)
+	}
+
+	out, err = exec.Command("exiftool", "-Orientation", "-n", dst).CombinedOutput()
+	if err != nil {
+		t.Fatalf("exiftool read failed: %v: %s", err, out)
+	}
+	if !strings.Contains(string(out), "6") {
+		t.Fatalf("EXIF Orientation not preserved, got: %s", out)
+	}
+}
+
+func TestAvifprocess(t *testing.T) {
+	src := writeJPEG(t)
+	defer os.Remove(src)
+
+	dst := filepath.Join(t.TempDir(), "out.avif")
+	if err := avifprocess(src, dst); err != nil {
+		t.Fatalf("avifprocess failed: %v", err)
+	}
+	info, err := os.Stat(dst)
+	if err != nil {
+		t.Fatalf("output file missing: %v", err)
+	}
+	if info.Size() == 0 {
+		t.Fatal("output AVIF is empty")
+	}
+	// AVIF files start with ftyp box; check for "avif" brand at offset 8
+	f, _ := os.Open(dst)
+	defer f.Close()
+	buf := make([]byte, 12)
+	f.Read(buf)
+	if string(buf[8:12]) != "avif" && string(buf[8:12]) != "avis" {
+		t.Fatalf("output does not look like AVIF (bytes 8-12: %q)", buf[8:12])
+	}
+	t.Logf("JPEG->AVIF: %d bytes", info.Size())
 }
